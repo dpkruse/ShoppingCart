@@ -18,6 +18,9 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                   .trim().toLowerCase().replace(/\W+/g, "_");
     console.log("Category question loaded — sec:", sec, "| qid:", qid);
 
+    // Store sec on the element so getAllSelections() can read it as fallback
+    $q.attr("data-sec", sec);
+
     // --- Build shared layout once ---
     if (!jQuery("#shopping-layout").length) {
         $q.before(
@@ -26,7 +29,11 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                 '<div id="shopping-sidebar" style="width:280px;border:1px solid #ccc;padding:12px;' +
                      'border-radius:8px;background:#fafafa;position:relative;">' +
                     '<div style="font-weight:700;margin-bottom:8px;">&#x1F6D2; Your cart</div>' +
-                    '<div id="cart-total" style="margin-bottom:8px;font-weight:600;">0 items</div>' +
+                    '<div id="cart-total" style="margin-bottom:4px;font-weight:600;">0 / 30 items</div>' +
+                    '<div id="cart-requirement" style="margin-bottom:8px;font-size:12px;color:#b8860b;' +
+                         'background:#fffbe6;border:1px solid #ffe58f;border-radius:4px;padding:4px 8px;">' +
+                        'Please select exactly 30 items to continue.' +
+                    '</div>' +
                     '<div id="cart-health" style="margin-bottom:10px;font-size:13px;"></div>' +
                     '<ul id="selected-items" style="padding-left:18px;margin:0;font-size:13px;"></ul>' +
                 '</div>' +
@@ -65,13 +72,19 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         var all = [];
         jQuery(".shopping-category-question").each(function() {
             var $catQ = jQuery(this);
+            var qSec = $catQ.attr("data-sec") || "unknown";
             $catQ.find("input[type='checkbox']:checked").each(function() {
                 var label = window.getItemLabel(jQuery(this));
                 var item = window.ITEM_REGISTRY ? window.ITEM_REGISTRY[label] : null;
-                all.push({ label: label, item: item });
+                all.push({ label: label, item: item, sec: qSec });
             });
         });
         return all;
+    }
+
+    // Title-case a category key (e.g. "dairy_eggs_fridge" -> "Dairy Eggs Fridge")
+    function formatCat(cat) {
+        return cat.replace(/_/g, " ").replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     }
 
     // --- Disable unchecked checkboxes when at the 30-item limit ---
@@ -104,14 +117,22 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
         var scorePercent = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
         var atMax        = total >= maxItems;
-        var limitStyle   = atMax
-            ? 'color:#c0392b;font-weight:bold;'
-            : 'color:#888;font-weight:normal;';
 
+        // Cart total — amber while building toward 30, green when exactly 30
+        var totalStyle = atMax
+            ? 'color:#2d7a2d;font-weight:bold;'
+            : 'color:#b8860b;font-weight:bold;';
+        var checkmark = atMax ? ' &#x2713;' : '';
         jQuery("#cart-total").html(
-            total + " item" + (total !== 1 ? "s" : "") + " in cart " +
-            '<span style="font-size:12px;' + limitStyle + '">(max ' + maxItems + ')</span>'
+            '<span style="' + totalStyle + '">' + total + ' / ' + maxItems + ' items' + checkmark + '</span>'
         );
+
+        // Requirement notice — hidden once the participant reaches 30
+        if (atMax) {
+            jQuery("#cart-requirement").hide();
+        } else {
+            jQuery("#cart-requirement").show();
+        }
 
         jQuery("#cart-health").html(
             '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
@@ -120,10 +141,12 @@ Qualtrics.SurveyEngine.addOnReady(function() {
             '<strong>Health score: ' + scorePercent + '%</strong>'
         );
 
-        // Group selected items by category for sidebar list
+        // Group selected items by category for sidebar list.
+        // Use entry.item.category when available; fall back to the question's own
+        // section key (data-sec) so items never appear under "other".
         var grouped = {};
         all.forEach(function(entry) {
-            var cat = entry.item ? entry.item.category : "other";
+            var cat = entry.item ? entry.item.category : entry.sec;
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push(entry.label);
         });
@@ -131,7 +154,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         var html = "";
         Object.keys(grouped).sort().forEach(function(cat) {
             html += '<li style="list-style:none;font-weight:600;margin-top:6px;">' +
-                    cat.charAt(0).toUpperCase() + cat.slice(1) + '</li>';
+                    formatCat(cat) + '</li>';
             grouped[cat].forEach(function(label) {
                 html += '<li>' + label + '</li>';
             });
