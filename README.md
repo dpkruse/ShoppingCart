@@ -232,18 +232,21 @@ After running `build_registry.py`, deploy the three JS files to Qualtrics:
 ### When item labels change in Qualtrics
 
 1. Open the survey in Qualtrics **Preview** mode
-2. Open the browser developer console
-3. Paste and run `export qualtrics labels via console.js`
-4. Copy the JSON output into the **`qualtrics`** tab of `Combined Justification 8.05.2026.xlsx`
-5. Run `python build_registry.py`
-6. Paste the updated JS into Q1 ([see Deploying](#deploying-to-qualtrics))
+2. Open the browser developer console (F12 → Console)
+3. Paste and run `export qualtrics labels via console.js` — a file named `qualtrics_export.json` downloads automatically
+4. Move `qualtrics_export.json` to `C:\MyApps\ShoppingCart\`
+5. Run `python build_registry.py --update-qualtrics qualtrics_export.json` — updates the `qualtrics` tab in the Excel file
+6. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx` — regenerates the JS
+7. Paste the updated JS into Q1 ([see Deploying](#deploying-to-qualtrics))
+
+> **Note:** Step 5 replaces all manual copy-paste into Excel. The `qualtrics` tab is now written entirely by the script.
 
 ### When new items are added
 
 1. Add a row to the relevant category tab in the Excel file (ItemID, Product Name, Tag, Final Label)
 2. Add a basket assignment row to the `baskets` tab
-3. Re-export Qualtrics labels (step 1–4 above)
-4. Run `python build_registry.py`
+3. Re-export Qualtrics labels (steps 1–5 above)
+4. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
 5. If the script warns `no confident match for <ItemID>`, add the item to an overrides file and re-run with `--overrides`
 
 ### When basket assignments change

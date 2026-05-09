@@ -209,17 +209,20 @@ Review the `--populate-baskets` console output carefully for any fuzzy match war
 ### When item labels change in Qualtrics
 
 1. Open the survey in Qualtrics **Preview** mode
-2. Open the browser developer console
-3. Paste and run `export qualtrics labels via console.js`
-4. Copy the JSON output into the `qualtrics` tab of the master Excel spreadsheet
-5. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
-6. Paste the updated JS into Q1
+2. Open the browser developer console (F12 → Console)
+3. Paste and run `export qualtrics labels via console.js` — downloads `qualtrics_export.json` automatically
+4. Move `qualtrics_export.json` to the project folder
+5. Run `python build_registry.py --update-qualtrics qualtrics_export.json` — rewrites the `qualtrics` tab in the Excel file
+6. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
+7. Paste the updated JS into Q1
+
+The `--update-qualtrics` step replaces all manual editing of the `qualtrics` tab. The tab is now fully written by the script; do not edit it by hand.
 
 ### When new items are added
 
 1. Add a row to the relevant category tab in the Excel file (ItemID, Product Name, Tag, Final Label)
 2. Add a Y-marker row for the new item to the `baskets` tab
-3. Re-export Qualtrics labels (steps 1–4 above)
+3. Re-export Qualtrics labels (steps 1–5 in the section above)
 4. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
 5. If the script warns `no confident match for <ItemID>`, add the item to `bakery_dairy_overrides.xlsx` (or a new overrides file) and re-run with `--overrides`
 
