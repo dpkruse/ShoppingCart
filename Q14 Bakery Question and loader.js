@@ -24,14 +24,31 @@ Qualtrics.SurveyEngine.addOnReady(function() {
             '<div id="shopping-layout" style="display:flex;gap:16px;align-items:flex-start;">' +
                 '<div id="shopping-main" style="flex:1;"></div>' +
                 '<div id="shopping-sidebar" style="width:280px;border:1px solid #ccc;padding:12px;' +
-                     'border-radius:8px;background:#fafafa;position:sticky;top:20px;">' +
-                    '<div style="font-weight:700;margin-bottom:8px;">🛒 Your cart</div>' +
+                     'border-radius:8px;background:#fafafa;position:relative;">' +
+                    '<div style="font-weight:700;margin-bottom:8px;">&#x1F6D2; Your cart</div>' +
                     '<div id="cart-total" style="margin-bottom:8px;font-weight:600;">0 items</div>' +
                     '<div id="cart-health" style="margin-bottom:10px;font-size:13px;"></div>' +
                     '<ul id="selected-items" style="padding-left:18px;margin:0;font-size:13px;"></ul>' +
                 '</div>' +
             '</div>'
         );
+
+        // Sticky sidebar via margin-top on scroll.
+        // position:sticky breaks in Qualtrics when an ancestor has overflow:hidden.
+        // Adjusting margin-top achieves the same visual effect without requiring a
+        // clean overflow context.
+        jQuery(window).on("scroll.stickyCart resize.stickyCart", function() {
+            var layout  = document.getElementById("shopping-layout");
+            var sidebar = document.getElementById("shopping-sidebar");
+            if (!layout || !sidebar) return;
+            var TOP_GAP    = 20;
+            var layoutRect = layout.getBoundingClientRect();
+            var mt = Math.max(0, Math.min(
+                TOP_GAP - layoutRect.top,
+                layoutRect.height - sidebar.offsetHeight
+            ));
+            sidebar.style.marginTop = mt + "px";
+        });
     }
 
     // Move this question into the main panel
@@ -57,6 +74,18 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         return all;
     }
 
+    // --- Disable unchecked checkboxes when at the 30-item limit ---
+    function enforceLimit() {
+        var total = getAllSelections().length;
+        var atMax = total >= maxItems;
+        jQuery(".shopping-category-question")
+            .find("input[type='checkbox']:not(:checked)")
+            .each(function() {
+                jQuery(this).prop("disabled", atMax);
+                jQuery(this).closest("li").css("opacity", atMax ? "0.45" : "");
+            });
+    }
+
     // --- Update sidebar with cross-question totals ---
     function updateSidebar() {
         var all = getAllSelections();
@@ -67,20 +96,27 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
         all.forEach(function(entry) {
             if (entry.item) {
-                if (entry.item.tag === "healthy")   healthyCount++;
+                if (entry.item.tag === "healthy")        healthyCount++;
                 else if (entry.item.tag === "unhealthy") unhealthyCount++;
-                else neutralCount++;
+                else                                     neutralCount++;
             }
         });
 
         var scorePercent = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+        var atMax        = total >= maxItems;
+        var limitStyle   = atMax
+            ? 'color:#c0392b;font-weight:bold;'
+            : 'color:#888;font-weight:normal;';
 
-        jQuery("#cart-total").text(total + " item" + (total !== 1 ? "s" : "") + " in cart");
+        jQuery("#cart-total").html(
+            total + " item" + (total !== 1 ? "s" : "") + " in cart " +
+            '<span style="font-size:12px;' + limitStyle + '">(max ' + maxItems + ')</span>'
+        );
 
         jQuery("#cart-health").html(
-            '<span style="color:#2d7a2d;">🟢 Healthy: ' + healthyCount + '</span> &nbsp;' +
-            '<span style="color:#888;">⚪ Neutral: ' + neutralCount + '</span> &nbsp;' +
-            '<span style="color:#c0392b;">🔴 Unhealthy: ' + unhealthyCount + '</span><br>' +
+            '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
+            '<span style="color:#888;">&#x26AA; Neutral: ' + neutralCount + '</span> &nbsp;' +
+            '<span style="color:#c0392b;">&#x1F534; Unhealthy: ' + unhealthyCount + '</span><br>' +
             '<strong>Health score: ' + scorePercent + '%</strong>'
         );
 
@@ -109,7 +145,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         Qualtrics.SurveyEngine.setEmbeddedData("healthy_items", healthyCount);
     }
 
-    // --- Update this question's own counter + sidebar ---
+    // --- Update this question's own counter + sidebar + limit ---
     function updateDisplay() {
         var $checked = $q.find("input[type='checkbox']:checked");
         jQuery("#count-" + qid).text($checked.length);
@@ -125,6 +161,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         } catch(e) {}
 
         updateSidebar();
+        enforceLimit();
     }
 
     // Mark this question so getAllSelections() can find it
@@ -169,5 +206,6 @@ Qualtrics.SurveyEngine.addOnPageSubmit(function() {
 });
 
 Qualtrics.SurveyEngine.addOnUnload(function() {
+    jQuery(window).off("scroll.stickyCart resize.stickyCart");
     jQuery("#" + this.questionId).off("change cart:update");
 });
