@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Qualtrics ITEM_REGISTRY Converter</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; color: #2c3e50; padding: 24px; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: #fff; border-radius: 8px; border: 1px solid #dde1e7; padding: 20px; }
+  .panel h2 { font-size: 1rem; margin-bottom: 10px; color: #34495e; }
+  textarea { width: 100%; height: 280px; font-family: monospace; font-size: 12px;
+             border: 1px solid #ccc; border-radius: 6px; padding: 10px; resize: vertical; }
+  .btn { display: inline-block; padding: 10px 22px; border-radius: 6px; border: none;
+         cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
+  .btn-primary { background: #2980b9; color: #fff; }
+  .btn-primary:hover { background: #1f6fa0; }
+  .btn-copy { background: #27ae60; color: #fff; margin-left: 10px; }
+  .btn-copy:hover { background: #1e8449; }
+  .btn-row { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
+  .status { font-size: 0.85rem; padding: 8px 12px; border-radius: 5px; display: none; }
+  .status.ok  { background: #d4edda; color: #155724; display: block; }
+  .status.err { background: #f8d7da; color: #721c24; display: block; }
+  .warn-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;
+              padding: 10px 14px; font-size: 0.82rem; margin-top: 12px; display: none; }
+  .warn-box ul { margin: 6px 0 0 16px; }
+  .schema-note { background: #eaf3fb; border-left: 4px solid #2980b9; padding: 10px 14px;
+                 font-size: 0.82rem; border-radius: 0 6px 6px 0; margin-bottom: 16px; line-height: 1.6; }
+  code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
+  #output { height: 380px; background: #1e1e2e; color: #cdd6f4; border-color: #444; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;
+           font-weight: 600; margin-left: 6px; }
+  .badge-cnt { background: #dce8f5; color: #1a4a7a; }
+  #stats { font-size: 0.82rem; color: #555; margin-top: 8px; display: none; }
+</style>
+</head>
+<body>
+
+<h1>Qualtrics ITEM_REGISTRY Converter</h1>
+<p class="subtitle">Paste your CSV → get a ready-to-paste <code>window.ITEM_REGISTRY</code> JS object</p>
+
+<div class="schema-note">
+  <strong>Expected CSV columns (header row required):</strong><br>
+  <code>Item ID</code> &nbsp;|&nbsp; <code>Category</code> &nbsp;|&nbsp; <code>Label</code> &nbsp;|&nbsp;
+  <code>Tag</code> &nbsp;|&nbsp; <em>one column per basket condition</em> (e.g. <code>HealthyA</code>, <code>HealthyB</code>, <code>UnHealthyA</code>, <code>UnHealthyB</code>)<br><br>
+  <strong>Tag values:</strong> <code>Healthy</code> or <code>UnHealthy</code> (case-insensitive) &rarr; stored as <code>"healthy"</code> / <code>"unhealthy"</code><br>
+  <strong>Preselect:</strong> Any non-empty cell in a basket column = <code>true</code>. Empty = <code>false</code>.<br>
+  <strong>Basket key derivation:</strong> Column header lowercased, spaces&rarr;underscores. e.g. <code>UnHealthyA</code> &rarr; <code>unhealthy_a</code>. Must match your Qualtrics radio button labels exactly.
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>1. Paste CSV here</h2>
+    <textarea id="csvInput" placeholder="Paste your CSV data here (include the header row)..."></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="convert()">&#9654; Convert to ITEM_REGISTRY</button>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="warnBox" class="warn-box">
+      <strong>&#9888; Warnings — check these items:</strong>
+      <ul id="warnList"></ul>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>2. Copy this into Q1 JS <span id="itemBadge" class="badge badge-cnt" style="display:none"></span></h2>
+    <textarea id="output" readonly placeholder="Converted ITEM_REGISTRY will appear here..."></textarea>
+    <div id="stats"></div>
+    <div class="btn-row">
+      <button class="btn btn-copy" onclick="copyOutput()">&#128203; Copy to Clipboard</button>
+      <span id="copyMsg" style="font-size:0.85rem;color:#27ae60;display:none">&#10004; Copied!</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// CSV PARSER
+// Handles: quoted fields, escaped quotes (""), embedded newlines
+// inside quoted fields, trailing spaces in cells, \r\n line endings.
+// ---------------------------------------------------------------
+function parseCSV(text) {
+  var rows = [];
+  var row = [];
+  var inQuote = false;
+  var cell = '';
+  var i = 0;
+
+  // Normalise line endings but preserve them inside quoted fields
+  // We process char-by-char so we can handle embedded newlines correctly
+  while (i < text.length) {
+    var ch = text[i];
+
+    if (inQuote) {
+      if (ch === '"') {
+        // Peek ahead for escaped quote ""
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i += 2;
+          continue;
+        } else {
+          // Closing quote
+          inQuote = false;
+          i++;
+          continue;
+        }
+      } else if (ch === '\r' || ch === '\n') {
+        // Embedded newline inside quoted field — strip it (fixes the tag-shift bug)
+        // Skip \r\n pair
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        // Do NOT add to cell — this removes the embedded newline
+        i++;
+        continue;
+      } else {
+        cell += ch;
+        i++;
+        continue;
+      }
+    } else {
+      // Not in quote
+      if (ch === '"') {
+        inQuote = true;
+        i++;
+        continue;
+      } else if (ch === ',') {
+        row.push(cell.trim()); // trim trailing spaces from each cell
+        cell = '';
+        i++;
+        continue;
+      } else if (ch === '\r' || ch === '\n') {
+        // End of row
+        row.push(cell.trim());
+        cell = '';
+        // Skip \r\n pair
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        i++;
+        // Only add non-empty rows
+        if (row.some(function(c){ return c !== ''; })) {
+          rows.push(row);
+        }
+        row = [];
+        continue;
+      } else {
+        cell += ch;
+        i++;
+        continue;
+      }
+    }
+  }
+  // Last row (no trailing newline)
+  row.push(cell.trim());
+  if (row.some(function(c){ return c !== ''; })) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function toKey(str) {
+  return str.toLowerCase().replace(/\W+/g, '_').replace(/^_|_$/g, '');
+}
+
+function normaliseTag(tag) {
+  var t = (tag || '').toLowerCase().trim();
+  if (t === 'healthy') return 'healthy';
+  if (t === 'unhealthy') return 'unhealthy';
+  if (t === 'neutral') return 'neutral';
+  return t;
+}
+
+function escapeJS(str) {
+  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function convert() {
+  var raw = document.getElementById('csvInput').value.trim();
+  var statusEl  = document.getElementById('status');
+  var warnBox   = document.getElementById('warnBox');
+  var warnList  = document.getElementById('warnList');
+  var output    = document.getElementById('output');
+  var stats     = document.getElementById('stats');
+  var badge     = document.getElementById('itemBadge');
+
+  statusEl.className = 'status';
+  statusEl.textContent = '';
+  warnBox.style.display = 'none';
+  warnList.innerHTML = '';
+  stats.style.display = 'none';
+  badge.style.display = 'none';
+
+  if (!raw) {
+    statusEl.className = 'status err';
+    statusEl.textContent = 'No data — paste your CSV first.';
+    return;
+  }
+
+  var rows = parseCSV(raw);
+  if (rows.length < 2) {
+    statusEl.className = 'status err';
+    statusEl.textContent = 'Need at least a header row and one data row.';
+    return;
+  }
+
+  var headers = rows[0];
+  var colItemId = -1, colCategory = -1, colLabel = -1, colTag = -1;
+  var basketCols = [];
+
+  for (var i = 0; i < headers.length; i++) {
+    var h  = headers[i].trim();
+    var hl = h.toLowerCase().replace(/\s/g, '');
+    if (hl === 'itemid')       colItemId   = i;
+    else if (hl === 'category') colCategory = i;
+    else if (hl === 'label')    colLabel    = i;
+    else if (hl === 'tag')      colTag      = i;
+    else if (h !== '')          basketCols.push({ index: i, header: h, key: toKey(h) });
+  }
+
+  var missing = [];
+  if (colLabel    === -1) missing.push('Label');
+  if (colCategory === -1) missing.push('Category');
+  if (colTag      === -1) missing.push('Tag');
+  if (basketCols.length === 0) missing.push('at least one basket column');
+
+  if (missing.length) {
+    statusEl.className = 'status err';
+    statusEl.textContent = 'Missing required columns: ' + missing.join(', ');
+    return;
+  }
+
+  var warnings = [];
+  var entries  = [];
+  var categories = {};
+  var basketKeySummary = basketCols.map(function(b){ return b.key; });
+  var knownTags = ['healthy', 'unhealthy', 'neutral'];
+
+  for (var r = 1; r < rows.length; r++) {
+    var row = rows[r];
+    if (!row || row.length < 2) continue;
+
+    // Label: already trimmed by parser, but strip any residual internal newlines
+    var label    = (row[colLabel]    || '').replace(/[\r\n]/g, '').trim();
+    var category = (row[colCategory] || '').trim();
+    var rawTag   = (row[colTag]      || '').trim();
+    var tag      = normaliseTag(rawTag);
+    var itemId   = colItemId >= 0 ? (row[colItemId] || '').trim() : '';
+
+    if (!label) {
+      warnings.push('Row ' + (r + 1) + ': empty label — skipped');
+      continue;
+    }
+
+    if (!category) {
+      warnings.push('Row ' + (r + 1) + ' (' + label + '): empty category');
+    }
+
+    if (knownTags.indexOf(tag) === -1) {
+      warnings.push('Row ' + (r + 1) + ' (' + label + '): unrecognised tag "' + rawTag + '" — stored as-is');
+    }
+
+    var catKey = toKey(category);
+    categories[catKey] = category;
+
+    var preselectParts = [];
+    for (var b = 0; b < basketCols.length; b++) {
+      var bc      = basketCols[b];
+      var cellVal = (row[bc.index] || '').trim();
+      var sel     = cellVal !== '' && cellVal.toLowerCase() !== 'false' && cellVal !== '0';
+      preselectParts.push(bc.key + ': ' + sel);
+    }
+
+    var line = '    "' + escapeJS(label) + '": { '
+             + 'category: "' + escapeJS(catKey) + '", '
+             + 'tag: "' + escapeJS(tag) + '", '
+             + 'preselect: { ' + preselectParts.join(', ') + ' } }';
+
+    entries.push({ label: label, line: line, tag: tag });
+  }
+
+  if (entries.length === 0) {
+    statusEl.className = 'status err';
+    statusEl.textContent = 'No valid rows found. Check your CSV format.';
+    return;
+  }
+
+  // Build output
+  var lines = [];
+  lines.push('// ITEM_REGISTRY — ' + entries.length + ' items across ' + Object.keys(categories).length + ' categories');
+  lines.push('// Basket conditions: ' + basketKeySummary.join(', '));
+  lines.push('// Generated: ' + new Date().toLocaleString());
+  lines.push('//');
+  lines.push('// Paste this OUTSIDE addOnReady in Q1 (Condition Picker) JS — global scope');
+  lines.push('// Labels must exactly match Qualtrics choice text (spacing, punctuation, case)');
+  lines.push('');
+  lines.push('window.ITEM_REGISTRY = {');
+
+  for (var e = 0; e < entries.length; e++) {
+    var comma = e < entries.length - 1 ? ',' : '';
+    lines.push(entries[e].line + comma);
+  }
+  lines.push('};');
+
+  output.value = lines.join('\n');
+
+  var healthyCount   = entries.filter(function(e){ return e.tag === 'healthy';   }).length;
+  var unhealthyCount = entries.filter(function(e){ return e.tag === 'unhealthy'; }).length;
+  var neutralCount   = entries.filter(function(e){ return e.tag === 'neutral';   }).length;
+
+  stats.innerHTML = '<strong>' + entries.length + ' items</strong> | '
+    + '&#127802; Healthy: ' + healthyCount + ' &nbsp; '
+    + '&#128308; Unhealthy: ' + unhealthyCount + ' &nbsp; '
+    + '&#9898; Neutral: ' + neutralCount + ' &nbsp;|&nbsp; '
+    + 'Categories: ' + Object.keys(categories).map(function(k){ return '<code>' + k + '</code>'; }).join(', ')
+    + '<br>Basket keys: ' + basketKeySummary.map(function(k){ return '<code>' + k + '</code>'; }).join(', ');
+  stats.style.display = 'block';
+
+  badge.textContent = entries.length + ' items';
+  badge.style.display = 'inline-block';
+
+  statusEl.className = 'status ok';
+  statusEl.textContent = 'Converted — ' + entries.length + ' items. Copy the output into Q1 JS global scope.';
+
+  if (warnings.length) {
+    warnBox.style.display = 'block';
+    warnList.innerHTML = warnings.map(function(w){ return '<li>' + w + '</li>'; }).join('');
+  }
+}
+
+function copyOutput() {
+  var out = document.getElementById('output');
+  out.select();
+  document.execCommand('copy');
+  var msg = document.getElementById('copyMsg');
+  msg.style.display = 'inline';
+  setTimeout(function(){ msg.style.display = 'none'; }, 2000);
+}
+</script>
+</body>
+</html>

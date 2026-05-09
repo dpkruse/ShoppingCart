@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Excel lock files (created while the file is open in Excel)
+~$*
+
+# Stale intermediate artefacts
+label-review.csv
+*.csv.txt
+
+# Claude Code local settings (machine-specific, not project config)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
