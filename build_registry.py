@@ -539,8 +539,23 @@ def update_qualtrics_tab(json_path):
     """
     import json
 
-    with open(json_path, encoding='utf-8') as f:
-        data = json.load(f)
+    if not json_path.lower().endswith('.json'):
+        print(f'ERROR: --update-qualtrics expects a .json file (got "{json_path}").')
+        print('Run "export qualtrics labels via console.js" in the Qualtrics preview console')
+        print('to download qualtrics_export.json, then pass that file here.')
+        sys.exit(1)
+
+    # Try UTF-8-with-BOM first (common Windows download), then plain UTF-8
+    raw = open(json_path, 'rb').read()
+    for enc in ('utf-8-sig', 'utf-8', 'latin-1'):
+        try:
+            data = json.loads(raw.decode(enc))
+            break
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+    else:
+        print('ERROR: could not decode the JSON file. Re-download qualtrics_export.json and try again.')
+        sys.exit(1)
 
     order      = data.get('order', [])
     categories = data.get('categories', {})
