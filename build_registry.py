@@ -5,8 +5,9 @@ PRIMARY SOURCE — Main Excel spreadsheet (EXCEL_PATH):
   - One tab per product category (see CATEGORY_SHEETS below): columns ItemID, Product Name,
     Final Label, Tag.  Used to resolve Qualtrics-rendered labels via exact then fuzzy match.
   - 'qualtrics' tab: export of Qualtrics-rendered label text, grouped by category header rows.
-    Re-export this tab after any Qualtrics survey edit using
-    'export qualtrics labels via console.js'.
+    Update this tab after any Qualtrics label change:
+      1. Run 'export qualtrics labels via console.js' in the browser console (downloads qualtrics_export.json)
+      2. python build_registry.py --update-qualtrics qualtrics_export.json
   - 'baskets' tab: basket assignments for ALL 10 categories.
     Required columns (exact, case-insensitive):
       ItemID | Category | Label | Tag | Healthy | Neutral | Unhealthy
@@ -20,8 +21,9 @@ SECONDARY SOURCE — Overrides Excel file (optional, --overrides flag):
     the Excel product name differs significantly from how it appears in the survey.
 
 EXAMPLE USAGE:
-  python build_registry.py                          # baseline: main Excel only
-  python build_registry.py --overrides fixes.xlsx  # apply label overrides on top
+  python build_registry.py                                          # baseline: main Excel only
+  python build_registry.py --overrides fixes.xlsx                  # apply label overrides on top
+  python build_registry.py --update-qualtrics qualtrics_export.json  # update qualtrics tab from browser export
 
 CREATING AN OVERRIDES FILE:
   Create an Excel file (.xlsx) with one sheet named 'label_overrides'.
@@ -91,6 +93,16 @@ def parse_args():
             'Read the "default conditions" tab and write basket assignments (Healthy/Neutral/Unhealthy) '
             'into the "baskets" tab for all 10 categories. Run this once, then run without the flag to '
             'regenerate the JS registry.'
+        )
+    )
+    parser.add_argument(
+        '--update-qualtrics',
+        metavar='JSON_FILE',
+        help=(
+            'Path to qualtrics_export.json (downloaded from the browser console via '
+            '"export qualtrics labels via console.js"). Updates the "qualtrics" tab in the '
+            'master Excel file, then exits. Run this after any Qualtrics label changes, '
+            'before running the normal build.'
         )
     )
     return parser.parse_args()
@@ -513,6 +525,63 @@ def build_insertion_block(all_categories, baskets):
     return '\n'.join(result)
 
 
+def update_qualtrics_tab(json_path):
+    """
+    Reads qualtrics_export.json (produced by the browser console script) and
+    rewrites the 'qualtrics' tab in the master Excel file.
+
+    The tab format (column B) that parse_qualtrics_tab() expects:
+        CategoryName (N items)
+        label 1
+        label 2
+        ...
+        [blank row between categories]
+    """
+    import json
+
+    with open(json_path, encoding='utf-8') as f:
+        data = json.load(f)
+
+    order      = data.get('order', [])
+    categories = data.get('categories', {})
+
+    if not order:
+        print('ERROR: JSON file has no "order" key or is empty. Was it produced by the export script?')
+        sys.exit(1)
+
+    wb = openpyxl.load_workbook(EXCEL_PATH)
+    if 'qualtrics' not in wb.sheetnames:
+        print('ERROR: master Excel file has no "qualtrics" tab. Cannot update.')
+        sys.exit(1)
+
+    ws = wb['qualtrics']
+
+    # Clear existing content
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.value = None
+
+    row_idx = 1
+    for i, cat_name in enumerate(order):
+        labels = categories.get(cat_name, [])
+        ws.cell(row=row_idx, column=2).value = f'{cat_name} ({len(labels)} items)'
+        row_idx += 1
+        for label in labels:
+            ws.cell(row=row_idx, column=2).value = label
+            row_idx += 1
+        if i < len(order) - 1:
+            row_idx += 1  # blank separator row between categories
+
+    wb.save(EXCEL_PATH)
+
+    total_items = sum(len(categories.get(c, [])) for c in order)
+    print(f'Updated "qualtrics" tab: {len(order)} categories, {total_items} items.')
+    for cat in order:
+        print(f'  {cat}: {len(categories.get(cat, []))} items')
+    print()
+    print('Next: run  python build_registry.py --overrides bakery_dairy_overrides.xlsx')
+
+
 def patch_js(insertion_block, total_items, cat_names):
     """Replaces the auto-generated section of the JS file in-place."""
     with open(JS_PATH, 'r', encoding='utf-8') as f:
@@ -552,6 +621,10 @@ def patch_js(insertion_block, total_items, cat_names):
 
 def main():
     args = parse_args()
+
+    if args.update_qualtrics:
+        update_qualtrics_tab(args.update_qualtrics)
+        return
 
     if args.populate_baskets:
         populate_baskets(EXCEL_PATH)
