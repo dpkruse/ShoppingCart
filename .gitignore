@@ -10,6 +10,9 @@ __pycache__/
 label-review.csv
 *.csv.txt
 
+# Excel backup files
+*.BACKUP.xlsx
+
 # Generated browser export — re-created by export qualtrics labels via console.js
 qualtrics_export.json
 

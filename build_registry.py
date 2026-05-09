@@ -432,7 +432,7 @@ def resolve_labels(wb, q_by_cat, label_overrides):
 
         itemid_col   = next((i for i, v in enumerate(h_low) if 'item' in v and 'id' in v), None)
         prodname_col = next((i for i, v in enumerate(h_low) if 'product' in v and 'name' in v), None)
-        final_col    = next((i for i, v in enumerate(h_low) if 'final' in v), None)
+        final_col    = next((i for i, v in enumerate(h_low) if v.strip() == 'label'), None)
         tag_col      = next((i for i, v in enumerate(h_low) if v.strip() == 'tag'), None)
 
         q_labels   = list(q_by_cat.get(q_cat, []))
