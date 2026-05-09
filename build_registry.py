@@ -9,9 +9,9 @@ PRIMARY SOURCE — Main Excel spreadsheet (EXCEL_PATH):
     'export qualtrics labels via console.js'.
   - 'baskets' tab: basket assignments for ALL 10 categories.
     Required columns (exact, case-insensitive):
-      ItemID | Category | Label | Tag | HealthyA | HealthyB | UnhealthyA | UnhealthyB
+      ItemID | Category | Label | Tag | Healthy | Neutral | Unhealthy
     Y = pre-selected in that basket condition; blank = not selected.
-    Edit this tab directly to change basket configurations, then re-run this script.
+    Populate this tab from the 'default conditions' tab via --populate-baskets, then re-run.
 
 SECONDARY SOURCE — Overrides Excel file (optional, --overrides flag):
   - Sheet named exactly 'label_overrides' with columns: ItemID | QualtricsLabel
@@ -53,14 +53,16 @@ JS_PATH = r'c:\MyApps\ShoppingCart\condition question and item metada registry.j
 #   - Qualtrics group name: must match the header text in the qualtrics tab (lowercase, before '(')
 #   - Registry category key: becomes the 'category' field in window.ITEM_REGISTRY entries
 CATEGORY_SHEETS = [
-    ('Drinks',        'drinks',       'drinks'),
-    ('Snacks',        'snacks',       'snacks'),
-    ('Fruit ',        'fruit',        'fruit'),       # note trailing space in tab name
-    ('Meat Seafood',  'meat seafood', 'meat_seafood'),
-    ('Freezer',       'frozen',       'frozen'),      # Qualtrics question title is "Frozen", not "Freezer"
-    ('Pantry',        'pantry',       'pantry'),
-    ('Ready to eat ', 'ready to eat', 'ready_to_eat'),  # note trailing space in tab name
-    ('Vegetables',    'vegetables',   'vegetables'),
+    ('Bakery  ',        'bakery',            'bakery'),           # note two trailing spaces in tab name
+    ('Dairy Eggs Fridge', 'dairy eggs fridge', 'dairy_eggs_fridge'),
+    ('Drinks',          'drinks',            'drinks'),
+    ('Snacks',          'snacks',            'snacks'),
+    ('Fruit ',          'fruit',             'fruit'),          # note trailing space in tab name
+    ('Meat Seafood',    'meat seafood',      'meat_seafood'),
+    ('Freezer',         'frozen',            'frozen'),         # Qualtrics question title is "Frozen"
+    ('Pantry',          'pantry',            'pantry'),
+    ('Ready to eat ',   'ready to eat',      'ready_to_eat'),   # note trailing space in tab name
+    ('Vegetables',      'vegetables',        'vegetables'),
 ]
 
 # Fuzzy match threshold — minimum SequenceMatcher ratio to accept a label match.
@@ -80,6 +82,15 @@ def parse_args():
             'Path to an Excel file with a sheet named "label_overrides" containing columns '
             'ItemID and QualtricsLabel. Overrides bypass exact/fuzzy label matching for the '
             'listed items. See module docstring for file format details.'
+        )
+    )
+    parser.add_argument(
+        '--populate-baskets',
+        action='store_true',
+        help=(
+            'Read the "default conditions" tab and write basket assignments (Healthy/Neutral/Unhealthy) '
+            'into the "baskets" tab for all 10 categories. Run this once, then run without the flag to '
+            'regenerate the JS registry.'
         )
     )
     return parser.parse_args()
@@ -120,24 +131,25 @@ def load_label_overrides(path):
 def load_baskets(wb):
     """
     Reads the 'baskets' tab from the workbook.
-    Returns dict mapping ItemID -> { healthy_a, healthy_b, unhealthy_a, unhealthy_b } (bools).
+    Returns dict mapping ItemID -> { healthy, neutral, unhealthy } (bools).
     Exits with a clear message if the tab or required columns are missing.
     """
     if 'baskets' not in wb.sheetnames:
         print('ERROR: main Excel file has no "baskets" tab. Aborting.')
-        print('The baskets tab must cover all 10 categories with columns:')
-        print('  ItemID | Category | Label | Tag | HealthyA | HealthyB | UnhealthyA | UnhealthyB')
+        print('Run: python build_registry.py --populate-baskets')
+        print('  to generate it from the "default conditions" tab, then re-run without the flag.')
         sys.exit(1)
     ws = wb['baskets']
     rows = list(ws.iter_rows(values_only=True))
     header = [str(c).strip().lower().replace(' ', '') if c else '' for c in rows[0]]
     col = {}
-    for name in ('itemid', 'healthya', 'healthyb', 'unhealthya', 'unhealthyb'):
+    for name in ('itemid', 'healthy', 'neutral', 'unhealthy'):
         try:
             col[name] = header.index(name)
         except ValueError:
             print(f'ERROR: "baskets" tab is missing required column "{name}".')
             print(f'       Found columns: {header}')
+            print('       Run: python build_registry.py --populate-baskets  to regenerate.')
             sys.exit(1)
     baskets = {}
     for row in rows[1:]:
@@ -145,16 +157,234 @@ def load_baskets(wb):
         if not iid:
             continue
         baskets[iid] = {
-            'healthy_a':   str(row[col['healthya']]   or '').strip().upper() == 'Y',
-            'healthy_b':   str(row[col['healthyb']]   or '').strip().upper() == 'Y',
-            'unhealthy_a': str(row[col['unhealthya']] or '').strip().upper() == 'Y',
-            'unhealthy_b': str(row[col['unhealthyb']] or '').strip().upper() == 'Y',
+            'healthy':   str(row[col['healthy']]   or '').strip().upper() == 'Y',
+            'neutral':   str(row[col['neutral']]   or '').strip().upper() == 'Y',
+            'unhealthy': str(row[col['unhealthy']] or '').strip().upper() == 'Y',
         }
     return baskets
 
 
 def norm(s):
     return (s or '').lower().strip()
+
+
+def populate_baskets(excel_path):
+    """
+    Reads the 'default conditions' tab and writes the 'baskets' tab with Y markers for all items
+    across all 10 categories. Fuzzy-matches condition labels to ItemIDs from category tabs.
+    Overwrites the existing baskets tab entirely.
+    """
+    import re
+
+    # ── Step 1: resolve qualtrics labels → ItemIDs for all 10 categories ────
+    print('Reading category tabs and resolving Qualtrics labels...')
+    wb_r = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+
+    q_by_cat       = parse_qualtrics_tab(wb_r)
+    all_categories = resolve_labels(wb_r, q_by_cat, {})
+
+    # ordered list of (ItemID, category_key, display_name, tag, qualtrics_label)
+    all_items = []
+    # lookup: norm(short_label) → iid
+    # Uses qualtrics labels when resolve_labels succeeds; falls back to product name otherwise.
+    qlabel_to_iid = {}
+
+    for cat_key, display, items in all_categories:
+        for iid, qlabel, tag in items:
+            all_items.append((iid, cat_key, display, tag, qlabel))
+            key = norm(qlabel)
+            if key and key not in qlabel_to_iid:
+                qlabel_to_iid[key] = iid
+
+    # Supplement lookup with baskets.csv short labels for Bakery/Dairy items.
+    # The Excel Bakery/Dairy tabs have no Final Labels, so resolve_labels falls back
+    # to long product names — too different from the informal "default conditions" labels.
+    # baskets.csv has the pre-verified short qualtrics-ish labels for those 47 items.
+    import csv
+    baskets_csv = re.sub(r'[^\\]+$', '', excel_path) + 'baskets.csv'
+    try:
+        with open(baskets_csv, newline='', encoding='utf-8-sig') as f:
+            for row in csv.DictReader(f):
+                iid   = row.get('Item ID', '').strip()
+                label = row.get('Label', '').strip()
+                if iid and label:
+                    key = norm(label)
+                    if key and key not in qlabel_to_iid:
+                        qlabel_to_iid[key] = iid
+        print(f'  Supplemented lookup with Bakery/Dairy labels from baskets.csv.')
+    except FileNotFoundError:
+        print(f'  NOTE: baskets.csv not found at {baskets_csv} — Bakery/Dairy label matching may be weaker.')
+
+    print(f'  Total lookup entries: {len(qlabel_to_iid)} label variants across {len(all_items)} items.')
+
+    # ── Step 2: read 'default conditions' tab ────────────────────────────────
+    print('Reading "default conditions" tab...')
+    if 'default conditions' not in wb_r.sheetnames:
+        print('ERROR: "default conditions" tab not found in Excel file. Aborting.')
+        sys.exit(1)
+
+    dc_ws = wb_r['default conditions']
+    dc_rows = list(dc_ws.iter_rows(values_only=True))
+
+    # Row 0 is the header; columns B, C, D (indices 1, 2, 3) are the 3 conditions.
+    # Skip column A (index 0) — researcher context only.
+    header_row = dc_rows[0] if dc_rows else []
+    condition_cols = {}  # condition_key -> column_index
+    for col_idx in [1, 2, 3]:
+        cell_val = str(header_row[col_idx] or '').strip() if len(header_row) > col_idx else ''
+        # Extract condition key: "Healthy 80% = ..." → "healthy"
+        key = norm(cell_val).split()[0] if cell_val else None
+        if key in ('healthy', 'neutral', 'unhealthy'):
+            condition_cols[key] = col_idx
+        else:
+            print(f'  WARNING: could not identify condition from column header {col_idx!r}: {cell_val!r}')
+
+    if len(condition_cols) != 3:
+        print(f'ERROR: expected 3 condition columns (healthy/neutral/unhealthy), found: {list(condition_cols.keys())}')
+        sys.exit(1)
+
+    print(f'  Conditions found: {list(condition_cols.keys())}')
+
+    # ── Step 3: fuzzy-match condition labels → ItemIDs ────────────────────────
+    # Use a lower threshold than the main label-resolution pipeline because the
+    # "default conditions" labels are short informal names, not full product names.
+    POPULATE_THRESHOLD = 0.65
+    all_norm_qkeys = list(qlabel_to_iid.keys())
+
+    def fuzzy_match(label_text):
+        n = norm(label_text)
+        if not n:
+            return None
+        if n in qlabel_to_iid:
+            return qlabel_to_iid[n], 1.0
+        if not all_norm_qkeys:
+            return None, 0.0
+        best  = max(all_norm_qkeys, key=lambda x: SequenceMatcher(None, n, x).ratio())
+        ratio = SequenceMatcher(None, n, best).ratio()
+        if ratio >= POPULATE_THRESHOLD:
+            return qlabel_to_iid[best], ratio
+        return None, ratio
+
+    # condition_key → set of matched ItemIDs
+    condition_assignments = {k: set() for k in condition_cols}
+    unmatched = []
+    matched_log = []
+
+    for row in dc_rows[1:]:
+        for cond_key, col_idx in condition_cols.items():
+            cell = str(row[col_idx] or '').strip() if len(row) > col_idx else ''
+            if not cell:
+                continue
+            matched_iid, score = fuzzy_match(cell)
+            if matched_iid:
+                condition_assignments[cond_key].add(matched_iid)
+                if score < 1.0:
+                    matched_log.append((cond_key, cell, matched_iid, score))
+            else:
+                unmatched.append((cond_key, cell))
+
+    if matched_log:
+        print(f'\n  Fuzzy matches (verify these are correct):')
+        for cond, label, iid, score in matched_log:
+            print(f'    [{cond}] "{label}" -> {iid}  (score={score:.2f})')
+
+    if unmatched:
+        print(f'\n  Not matched (not in survey or label too different):')
+        for cond, label in unmatched:
+            print(f'    [{cond}] "{label}"')
+        print()
+
+    for cond, iids in condition_assignments.items():
+        print(f'  {cond}: {len(iids)} items assigned')
+
+    # ── Step 4: write baskets tab ─────────────────────────────────────────────
+    print('Writing baskets tab...')
+    wb_r.close()
+    wb_w = openpyxl.load_workbook(excel_path, data_only=True)
+
+    if 'baskets' in wb_w.sheetnames:
+        del wb_w['baskets']
+    ws_out = wb_w.create_sheet('baskets')
+
+    ws_out.append(['ItemID', 'Category', 'Label', 'Tag', 'Healthy', 'Neutral', 'Unhealthy'])
+
+    for iid, cat_key, display, tag, qlabel in all_items:
+        ws_out.append([
+            iid,
+            display,
+            qlabel,
+            tag,
+            'Y' if iid in condition_assignments['healthy']   else '',
+            'Y' if iid in condition_assignments['neutral']   else '',
+            'Y' if iid in condition_assignments['unhealthy'] else '',
+        ])
+
+    wb_w.save(excel_path)
+    total_rows = len(all_items)
+    print(f'Done. Baskets tab written with {total_rows} items.')
+
+    # ── Step 5: generate overrides file for Bakery/Dairy ──────────────────────
+    # The Bakery  and Dairy Eggs Fridge tabs have no Final Labels, so resolve_labels()
+    # falls back to long product names that don't match Qualtrics.  Generate an overrides
+    # file from baskets.csv labels (already close to Qualtrics labels) matched against
+    # the qualtrics tab so the main build step picks up correct short labels.
+    print()
+    print('Generating Bakery/Dairy label overrides from baskets.csv...')
+    q_by_cat_full = parse_qualtrics_tab(wb_w)
+
+    overrides_rows = [['ItemID', 'QualtricsLabel']]
+    overrides_path = re.sub(r'[^\\]+$', '', excel_path) + 'bakery_dairy_overrides.xlsx'
+    n_overrides = 0
+
+    try:
+        with open(baskets_csv, newline='', encoding='utf-8-sig') as f:
+            for row in csv.DictReader(f):
+                iid   = row.get('Item ID', '').strip()
+                label = row.get('Label', '').strip()
+                cat   = row.get('Category', '').strip().lower()
+                if not iid or not label:
+                    continue
+
+                # Map category name to qualtrics tab key
+                q_cat_map = {'bakery': 'bakery', 'dairy eggs fridge': 'dairy eggs fridge'}
+                q_key = q_cat_map.get(cat)
+                if q_key is None:
+                    continue  # only B* and DEF*
+
+                q_labels_for_cat = q_by_cat_full.get(q_key, [])
+                if not q_labels_for_cat:
+                    continue
+
+                # Fuzzy-match baskets.csv label against qualtrics tab labels for this category
+                best_ql = max(q_labels_for_cat, key=lambda x: SequenceMatcher(None, norm(label), norm(x)).ratio())
+                best_score = SequenceMatcher(None, norm(label), norm(best_ql)).ratio()
+
+                if best_score >= 0.75:
+                    overrides_rows.append([iid, best_ql])
+                    n_overrides += 1
+                else:
+                    print(f'  WARNING: could not match {iid} ({label!r}) to qualtrics label '
+                          f'(best: {best_ql!r} score={best_score:.2f}) — add manually to overrides')
+
+    except FileNotFoundError:
+        print(f'  baskets.csv not found at {baskets_csv} — skipping overrides generation.')
+        overrides_path = None
+
+    if overrides_path and n_overrides > 0:
+        ov_wb = openpyxl.Workbook()
+        ov_ws = ov_wb.active
+        ov_ws.title = 'label_overrides'
+        for row_data in overrides_rows:
+            ov_ws.append(row_data)
+        ov_wb.save(overrides_path)
+        print(f'  Wrote {n_overrides} Bakery/Dairy overrides to {overrides_path}')
+        print()
+        print('NEXT STEPS:')
+        print('  1. python build_registry.py --overrides bakery_dairy_overrides.xlsx')
+        print('     (uses corrected Bakery/Dairy Qualtrics labels)')
+    else:
+        print()
+        print('NEXT STEP: run  python build_registry.py  (without --populate-baskets) to regenerate the JS.')
 
 
 def parse_qualtrics_tab(wb):
@@ -263,14 +493,13 @@ def build_insertion_block(all_categories, baskets):
         for iid, label, tag in items:
             if iid not in baskets:
                 print(f'  WARNING: {iid} ({label!r}) not found in baskets tab — no preselections assigned')
-            p   = baskets.get(iid, {'healthy_a': False, 'healthy_b': False,
-                                     'unhealthy_a': False, 'unhealthy_b': False})
+            p   = baskets.get(iid, {'healthy': False, 'neutral': False, 'unhealthy': False})
             pad = ' ' * (max_len - len(label) + 1)
             line = (
                 f'    "{label}":{pad}'
                 f'{{ category: "{cat_key}", tag: "{tag}", '
-                f'preselect: {{ healthy_a: {bv(p["healthy_a"])}, healthy_b: {bv(p["healthy_b"])}, '
-                f'unhealthy_a: {bv(p["unhealthy_a"])}, unhealthy_b: {bv(p["unhealthy_b"])} }} }}'
+                f'preselect: {{ healthy: {bv(p["healthy"])}, neutral: {bv(p["neutral"])}, '
+                f'unhealthy: {bv(p["unhealthy"])} }} }}'
             )
             new_lines.append(line)
 
@@ -313,12 +542,8 @@ def patch_js(insertion_block, total_items, cat_names):
     )
 
     new_content = new_content.replace(
-        '// ITEM_REGISTRY — 47 items across 2 categories (Bakery, Dairy Eggs Fridge)',
+        '// ITEM_REGISTRY — all items across 10 categories',
         f'// ITEM_REGISTRY — {total_items} items across 10 categories'
-    )
-    new_content = new_content.replace(
-        '// Source: baskets.csv — labels corrected to match Qualtrics choice text exactly',
-        f'// Additional categories (baskets from Excel baskets tab): {cat_names}'
     )
 
     with open(JS_PATH, 'w', encoding='utf-8') as f:
@@ -327,6 +552,10 @@ def patch_js(insertion_block, total_items, cat_names):
 
 def main():
     args = parse_args()
+
+    if args.populate_baskets:
+        populate_baskets(EXCEL_PATH)
+        return
 
     label_overrides = {}
     if args.overrides:
@@ -341,7 +570,7 @@ def main():
 
     insertion_block = build_insertion_block(all_categories, baskets)
 
-    total_items = 47 + sum(len(items) for _, _, items in all_categories)
+    total_items = sum(len(items) for _, _, items in all_categories)
     cat_names   = ', '.join(d for _, d, _ in all_categories)
 
     patch_js(insertion_block, total_items, cat_names)
