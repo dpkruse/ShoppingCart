@@ -11,11 +11,15 @@ Qualtrics.SurveyEngine.addOnReady(function() {
     window._questionEngines[qid] = self;
 
     // --- Derive section key from question text ---
+    // Strip emoji and leading/trailing underscores so "🥛 Dairy, Eggs & Fridge" → "dairy_eggs_fridge"
     var qLabel = "";
     try { qLabel = this.getQuestionInfo().QuestionText; } catch(e) {}
     if (!qLabel) qLabel = "unknown";
     var sec = jQuery("<div>").html(qLabel).text()
-                  .trim().toLowerCase().replace(/\W+/g, "_");
+                  .trim().toLowerCase()
+                  .replace(/\W+/g, "_")
+                  .replace(/^_+|_+$/g, "")
+                  .replace(/_+/g, "_");
     console.log("Category question loaded — sec:", sec, "| qid:", qid);
 
     // Store sec on the element so getAllSelections() can read it as fallback
@@ -67,14 +71,29 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                   sec.charAt(0).toUpperCase() + sec.slice(1) + ': <span id="count-' + qid + '">0</span> selected</div>');
     }
 
+    // --- Check if a single checkbox is selected via Qualtrics API ---
+    // setChoiceValue() updates Qualtrics' internal state but does NOT reliably set the
+    // DOM :checked attribute, so we must use getChoiceValue() for preselected items.
+    function isChoiceSelected(engine, $cb) {
+        var choiceId = $cb.attr("choiceid");
+        if (engine && choiceId) {
+            try { return !!engine.getChoiceValue(choiceId); } catch(e) {}
+        }
+        return $cb.prop("checked");
+    }
+
     // --- Collect all checked items across ALL category questions ---
     function getAllSelections() {
         var all = [];
         jQuery(".shopping-category-question").each(function() {
             var $catQ = jQuery(this);
+            var catQid = $catQ.attr("id");
             var qSec = $catQ.attr("data-sec") || "unknown";
-            $catQ.find("input[type='checkbox']:checked").each(function() {
-                var label = window.getItemLabel(jQuery(this));
+            var engine = (window._questionEngines || {})[catQid];
+            $catQ.find("input[type='checkbox']").each(function() {
+                var $cb = jQuery(this);
+                if (!isChoiceSelected(engine, $cb)) return;
+                var label = window.getItemLabel($cb);
                 var item = window.ITEM_REGISTRY ? window.ITEM_REGISTRY[label] : null;
                 all.push({ label: label, item: item, sec: qSec });
             });
@@ -91,12 +110,18 @@ Qualtrics.SurveyEngine.addOnReady(function() {
     function enforceLimit() {
         var total = getAllSelections().length;
         var atMax = total >= maxItems;
-        jQuery(".shopping-category-question")
-            .find("input[type='checkbox']:not(:checked)")
-            .each(function() {
-                jQuery(this).prop("disabled", atMax);
-                jQuery(this).closest("li").css("opacity", atMax ? "0.45" : "");
+        jQuery(".shopping-category-question").each(function() {
+            var $catQ = jQuery(this);
+            var catQid = $catQ.attr("id");
+            var engine = (window._questionEngines || {})[catQid];
+            $catQ.find("input[type='checkbox']").each(function() {
+                var $cb = jQuery(this);
+                if (!isChoiceSelected(engine, $cb)) {
+                    $cb.prop("disabled", atMax);
+                    $cb.closest("li").css("opacity", atMax ? "0.45" : "");
+                }
             });
+        });
     }
 
     // --- Update sidebar with cross-question totals ---
@@ -170,16 +195,18 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
     // --- Update this question's own counter + sidebar + limit ---
     function updateDisplay() {
-        var $checked = $q.find("input[type='checkbox']:checked");
-        jQuery("#count-" + qid).text($checked.length);
-
-        // Per-category embedded data
+        var count = 0;
         var items = [];
-        $checked.each(function() {
-            items.push(window.getItemLabel(jQuery(this)));
+        $q.find("input[type='checkbox']").each(function() {
+            var $cb = jQuery(this);
+            if (!isChoiceSelected(self, $cb)) return;
+            count++;
+            items.push(window.getItemLabel($cb));
         });
+
+        jQuery("#count-" + qid).text(count);
         try {
-            Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", $checked.length);
+            Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", count);
             Qualtrics.SurveyEngine.setEmbeddedData(sec + "_labels", items.join(", "));
         } catch(e) {}
 
@@ -205,6 +232,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 });
 
 Qualtrics.SurveyEngine.addOnPageSubmit(function() {
+    var engine = (window._questionEngines || {})[this.questionId];
     var qid = this.questionId;
     var $q = jQuery("#" + qid);
 
@@ -212,20 +240,33 @@ Qualtrics.SurveyEngine.addOnPageSubmit(function() {
     try { qLabel = this.getQuestionInfo().QuestionText; } catch(e) {}
     if (!qLabel) qLabel = "unknown";
     var sec = jQuery("<div>").html(qLabel).text()
-                  .trim().toLowerCase().replace(/\W+/g, "_");
+                  .trim().toLowerCase()
+                  .replace(/\W+/g, "_")
+                  .replace(/^_+|_+$/g, "")
+                  .replace(/_+/g, "_");
 
-    var $checked = $q.find("input[type='checkbox']:checked");
+    var count = 0;
     var items = [];
-    $checked.each(function() {
-        var id = jQuery(this).attr("id");
+    $q.find("input[type='checkbox']").each(function() {
+        var $cb = jQuery(this);
+        var choiceId = $cb.attr("choiceid");
+        var isSelected = false;
+        if (engine && choiceId) {
+            try { isSelected = !!engine.getChoiceValue(choiceId); } catch(e) { isSelected = $cb.prop("checked"); }
+        } else {
+            isSelected = $cb.prop("checked");
+        }
+        if (!isSelected) return;
+        count++;
+        var id = $cb.attr("id");
         var label = id ? jQuery("label[for='" + id + "']").filter("[id$='-label']").text().trim() : "";
-        if (!label) label = jQuery(this).closest("li").text().trim();
+        if (!label) label = $cb.closest("li").text().trim();
         items.push(label || "Item");
     });
 
-    Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", $checked.length);
+    Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", count);
     Qualtrics.SurveyEngine.setEmbeddedData(sec + "_labels", items.join(", "));
-    console.log("onPageSubmit:", sec, $checked.length, "items");
+    console.log("onPageSubmit:", sec, count, "items");
 });
 
 Qualtrics.SurveyEngine.addOnUnload(function() {
