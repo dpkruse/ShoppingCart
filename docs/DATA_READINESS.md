@@ -1,6 +1,6 @@
 # Data Readiness: How Raw Research Data Was Engineered for the Shopping Cart Survey
 
-**Document version:** May 2026
+**Document version:** May 2026 (updated 9 May 2026 — 3-condition basket model)
 **Audience:** Imogen (researcher), future developers, survey maintainers
 
 ---
@@ -29,7 +29,7 @@ Imogen had independently discovered Qualtrics' JavaScript panel and, using AI as
 
 ## 3. Data Wrangling in Claude Code
 
-The three artefacts brought into Claude Code were: the Qualtrics survey export (providing DOM-rendered label text), the Excel spreadsheet (providing item metadata, health classifications, and the two existing basket assignments), and the partial JavaScript implementation already in place. The engineering problem was to unite these into a single ITEM_REGISTRY object — a JavaScript dictionary keyed by exact item label text, where each entry carries the item's tag (e.g., "DRK1"), its health classification, its category key, and its basket assignments for all four conditions.
+The three artefacts brought into Claude Code were: the Qualtrics survey export (providing DOM-rendered label text), the Excel spreadsheet (providing item metadata, health classifications, and the two existing basket assignments), and the partial JavaScript implementation already in place. The engineering problem was to unite these into a single ITEM_REGISTRY object — a JavaScript dictionary keyed by exact item label text, where each entry carries the item's tag (e.g., "DRK1"), its health classification, its category key, and its basket assignments for all conditions.
 
 The fundamental difficulty was that the two data sources could not be directly joined. The Excel spreadsheet held all the metadata but used inconsistent or absent label text. The Qualtrics DOM held the authoritative rendered labels (the strings that preselection logic must match exactly) but carried no metadata whatsoever. There was no shared key — no item ID, no normalised product name, no field present in both sources — that would allow a straightforward database-style join. Bridging these two sources required a multi-stage reconciliation pipeline rather than any simple lookup.
 
@@ -65,7 +65,7 @@ The result of running the pipeline across all 240 items was 176 items resolved a
 
 The 33 items that required manual resolution fell into several recognisable patterns. Some involved brand versus generic naming conventions, where the Excel spreadsheet used a generic descriptor and Qualtrics rendered a more specific product name, or vice versa. Others involved abbreviations that were too short for fuzzy matching to resolve reliably. A small number involved entirely different names for what could be confirmed as the same product through context and category position.
 
-Each override was entered into the `OVERRIDES` dictionary as a mapping from the Qualtrics label (the key that must appear in the registry) to the ItemID from the Excel spreadsheet (providing the metadata linkage). The 33 overrides by category are as follows.
+Each override is recorded in an external Excel overrides file (passed to `build_registry.py` via the `--overrides` flag) as a mapping from the ItemID to the correct Qualtrics label. The 33 overrides by category are as follows.
 
 In Drinks (5 items): DRK1 maps "Natural spring water" from the Excel entry "Spring Water"; DRK2 maps "Lightly sparkling water" from "Sparkling Water"; DRK4 maps "Orange juice" from "Orange Juice No added Sugar"; DRK7 maps "Electrolyte sport drink" from "Sports Drink Flavoured"; DRK11 maps "Protein water berry" from "Protein Water Berry Whey Protein Isolate".
 
@@ -91,46 +91,138 @@ The decision was made to include it in the registry rather than exclude it. Excl
 
 ---
 
-## 8. Basket Assignment for 8 New Categories
+## 8. The 3-Condition Basket Model (May 2026)
 
-The Excel spreadsheet's baskets tab contained basket assignments (which items should be pre-selected for healthy_a, healthy_b, unhealthy_a, and unhealthy_b conditions) only for Bakery and Dairy. The eight remaining categories — Drinks, Snacks, Meat and Seafood, Frozen, Pantry, Ready to Eat, Vegetables, and Fruit — had no assignments anywhere in the project materials.
+### 8.1 Why the model changed
 
-Rather than leave these categories without preselection (which would mean participants in all conditions saw identical starting states for eight out of ten categories), basket assignments must be specified explicitly in the `baskets` tab of the master Excel spreadsheet. The `build_registry.py` script reads basket assignments exclusively from this tab; there is no fallback randomisation or code-embedded logic. This means the baskets tab is the single place where anyone — developer or researcher — goes to change what gets pre-selected for any participant in any condition.
+The original basket design used four conditions — healthy_a, healthy_b, unhealthy_a, unhealthy_b — each pre-selecting 2 items per category (20 items total, spread across 10 categories). This model required separate per-category assignment logic and left the eight non-Bakery/Dairy categories entirely without assignments.
 
-The baskets tab must be extended to cover all 10 categories. The required columns are `ItemID`, `Category`, `Label`, `Tag`, `HealthyA`, `HealthyB`, `UnhealthyA`, and `UnhealthyB`. A cell marked `Y` in any basket column means that item is pre-selected for participants assigned to that condition. Blank means not pre-selected. Once the researcher has specified the desired assignments for the eight new categories and the tab is fully populated, re-running `python build_registry.py` will regenerate the complete registry with those assignments reflected.
+In May 2026, Imogen defined a new cross-category basket design with three conditions reflecting the health composition of the default cart as a whole:
 
-During the initial construction phase, basket assignments for the eight new categories were generated programmatically using a shuffled-pool algorithm (`random.seed(42)`) as a temporary measure. These algorithmic assignments have not been reviewed by the researcher for scientific appropriateness and should be replaced with Imogen's deliberate choices before the survey is used in data collection. Until the baskets tab is extended with explicit assignments, the script will warn for each missing ItemID and default to no preselections for those items.
+| Condition | Health composition | Items pre-selected |
+|-----------|-------------------|-------------------|
+| Healthy   | ~80% green items  | ~25 items across all 10 categories |
+| Neutral   | ~50% green items  | ~26 items across all 10 categories |
+| Unhealthy | ~20% green items  | ~27 items across all 10 categories |
+
+This replaced the per-category 2-item model entirely. Items can now appear in multiple conditions (e.g., a neutral staple like "Cinnamon scroll" pre-checked in all three), and the basket is defined at the whole-survey level rather than category-by-category. The four old condition keys (healthy_a, healthy_b, unhealthy_a, unhealthy_b) are gone; the new keys are `healthy`, `neutral`, `unhealthy`.
+
+### 8.2 The "default conditions" tab as source of truth
+
+Imogen captured her basket decisions in a new tab in the master Excel file: `default conditions`. This tab has four columns. Column A contains researcher context notes (not used by any script). Columns B, C, and D each represent one condition (Healthy / Neutral / Unhealthy) and list the informal item names assigned to that condition — approximately 25–27 items per column.
+
+The labels in this tab are written in natural language ("eggs", "lean mince meat", "banannas") rather than exact Qualtrics-rendered strings. They cannot be matched directly against the ITEM_REGISTRY keys; they must be resolved through the same fuzzy-matching pipeline used for label reconciliation.
+
+![Default conditions tab — screenshot added 9 May 2026](../default%20choices%20for%20baskets%209.05.2026.png)
+
+### 8.3 The `--populate-baskets` pipeline
+
+A new mode was added to `build_registry.py` to translate the "default conditions" tab into structured basket assignments:
+
+```
+python build_registry.py --populate-baskets
+```
+
+What this does:
+
+1. Calls `resolve_labels()` to build a lookup of resolved Qualtrics labels → ItemIDs for all 10 categories
+2. Supplements this lookup with entries from `baskets.csv` for Bakery and Dairy, whose product names in Excel are too long and brand-heavy for fuzzy matching to work reliably
+3. Reads columns B, C, D from the "default conditions" tab (column headers identified by first word: Healthy / Neutral / Unhealthy, case-insensitive)
+4. For each item label in each condition column, fuzzy-matches against the lookup using a lower threshold (POPULATE_THRESHOLD = 0.65) appropriate for informal natural-language names
+5. Prints all matches to the console for researcher review — including the matched ItemID, the score, and the Qualtrics label — so any questionable matches are visible
+6. Clears the `baskets` sheet and writes 240+ rows with the header `ItemID | Category | Label | Tag | Healthy | Neutral | Unhealthy`, with `Y` in the condition columns for matched items
+7. Saves the workbook
+
+After `--populate-baskets` completes, the standard run (`python build_registry.py --overrides bakery_dairy_overrides.xlsx`) reads the updated baskets tab and regenerates the JS registry.
+
+### 8.4 The `bakery_dairy_overrides.xlsx` file
+
+Because Bakery and Dairy items have no useful Final Labels in Excel (the column is empty), and their product names are long brand-heavy strings that fail fuzzy matching, a separate mechanism was needed. During the `--populate-baskets` run, the script auto-generates `bakery_dairy_overrides.xlsx` — an overrides file mapping all 47 Bakery and Dairy ItemIDs to their correct Qualtrics-rendered labels, derived by fuzzy-matching `baskets.csv` entries (which carry short, clean labels) against the qualtrics tab. This file must be passed to the standard build run:
+
+```
+python build_registry.py --overrides bakery_dairy_overrides.xlsx
+```
+
+Without this overrides file, all Bakery and Dairy items will appear in the registry with `no_match` fallback labels and fail to preselect.
+
+### 8.5 Known false positives from the first populate run
+
+The initial `--populate-baskets` run on 9 May 2026 produced two false positive basket assignments that require manual correction in the baskets tab before the registry is considered production-ready:
+
+- **DRK1 "Spring Water"** received Y marks it should not have. The condition label "tuna in spring water" fuzzy-matched to DRK1 (Spring Water) at score 0.75 instead of the correct target, PAN item "Springwater tuna". Correct action: clear Y marks from DRK1 in the baskets tab; add Y marks to PAN "Springwater tuna".
+
+- **FRZ18 "Chocolate cake"** received Y marks it should not have. The condition label "Chocolate cereal" matched FRZ18 at score 0.80 instead of the correct PAN item "Chocolate flavoured cereal" (score 0.76). Correct action: clear Y marks from FRZ18 in the baskets tab; add Y marks to PAN "Chocolate flavoured cereal".
+
+After making these corrections in the Excel baskets tab, re-run `python build_registry.py --overrides bakery_dairy_overrides.xlsx` to regenerate the JS.
 
 ---
 
 ## 9. Pre-Existing Label Fixes (Bakery)
 
-When the Bakery basket assignments from the baskets.csv file were loaded into the registry, four items were found to have label text in the CSV that did not match what Qualtrics rendered in the DOM. These were not newly introduced errors but pre-existing mismatches that had gone undetected because the basket assignments in Qualtrics had been set manually and the label text in the spreadsheet had never been checked against the DOM.
+When the Bakery basket assignments from `baskets.csv` were loaded into the registry, four items were found to have label text in the CSV that did not match what Qualtrics rendered in the DOM. These were not newly introduced errors but pre-existing mismatches that had gone undetected because the basket assignments in Qualtrics had been set manually and the label text in the spreadsheet had never been checked against the DOM.
 
-The four corrections applied in the registry are: "Bagel plain" corrected to "Bagel Plain" (capitalisation of the second word); "Wholemeal roll" corrected to "Wholemeal Roll" (same pattern); "Wholemeal English Muffin" corrected to "Wholemeal english muffin" (the second and third words are lowercase in Qualtrics despite being capitalised in the spreadsheet); and "Wholegrain Wrap" corrected to "Wholemeal Wrap" (a different word entirely — the CSV used "Wholegrain" while Qualtrics renders "Wholemeal"; these were confirmed to refer to the same product through context and category position).
+The four corrections are: "Bagel plain" corrected to "Bagel Plain" (capitalisation of the second word); "Wholemeal roll" corrected to "Wholemeal Roll" (same pattern); "Wholemeal English Muffin" corrected to "Wholemeal english muffin" (the second and third words are lowercase in Qualtrics despite being capitalised in the spreadsheet); and "Wholegrain Wrap" corrected to "Wholemeal Wrap" (a different word entirely — the CSV used "Wholegrain" while Qualtrics renders "Wholemeal"; these were confirmed to refer to the same product through context and category position).
 
-Without these corrections, the pre-selections for these four Bakery items would silently fail for every participant in every basket condition that includes them. The corrections are applied directly in the ITEM_REGISTRY values and are not visible in the baskets.csv source file.
+These corrections are captured in `bakery_dairy_overrides.xlsx` (see Section 8.4). When `build_registry.py` is run with `--overrides bakery_dairy_overrides.xlsx`, the corrected Qualtrics labels are applied for all Bakery and Dairy items. Without this overrides file, the pre-selections for these four Bakery items would silently fail for every participant in every basket condition that includes them.
 
 ---
 
 ## 10. Known Risks and Open Items
 
-**FRZ12 — Chocolate icecream (high uncertainty).** The mapping of FRZ12 to the Qualtrics label "Chocolate icecream" was assigned by process of elimination rather than by positive identification. The Excel entry for FRZ12 was "Frozen Dessert Cones - Brownie", which does not clearly correspond to any single Qualtrics frozen item. After all other frozen items were matched, "Chocolate icecream" was the only unmatched Qualtrics label remaining, and FRZ12 was assigned to it on that basis. This is not a confirmed match. Before the survey is used in production, the actual Qualtrics survey should be opened and the frozen category inspected to confirm that "Chocolate icecream" is the correct label for the item intended to be FRZ12. If it is not, the OVERRIDES entry for FRZ12 in `build_registry.py` must be corrected and the registry regenerated.
+**FRZ12 — Chocolate icecream (high uncertainty).** The mapping of FRZ12 to the Qualtrics label "Chocolate icecream" was assigned by process of elimination rather than by positive identification. The Excel entry for FRZ12 was "Frozen Dessert Cones - Brownie", which does not clearly correspond to any single Qualtrics frozen item. After all other frozen items were matched, "Chocolate icecream" was the only unmatched Qualtrics label remaining, and FRZ12 was assigned to it on that basis. This is not a confirmed match. Before the survey is used in production, the actual Qualtrics survey should be opened and the frozen category inspected to confirm that "Chocolate icecream" is the correct label for the item intended to be FRZ12. If it is not, the `label_overrides` entry for FRZ12 in `bakery_dairy_overrides.xlsx` (or a separate overrides file) must be corrected and the registry regenerated.
 
-**Excel baskets tab is incomplete — action required before production.** The baskets tab currently contains only the Bakery and Dairy rows (47 items). The eight new categories have no rows in this tab yet. Until Imogen adds explicit basket assignments for all remaining items, running `build_registry.py` will warn for each missing ItemID and produce a registry with no preselections for those categories. The tab must be fully populated with researcher-specified `Y` markers before the survey can be used in data collection. See Section 8 for the required column format.
+**Two false positive basket assignments require manual correction.** The initial `--populate-baskets` run on 9 May 2026 misassigned Y markers for DRK1 ("Spring Water") and FRZ18 ("Chocolate cake"). See Section 8.5 for the specific corrections required. These must be fixed in the baskets tab before the survey is used in data collection.
+
+**Qualtrics condition picker question needs updating.** The Q1 condition-picker question must be updated in the Qualtrics survey editor to offer three radio options (Healthy / Neutral / Unhealthy) rather than the original four. The JavaScript dynamically derives the condition key from the selected radio label text, so no JS changes are needed — only the Qualtrics question content needs updating.
 
 **The `sec` variable depends on question title text.** The JavaScript code that drives category-level basket preselection and scoring derives its internal category key (the `sec` variable, e.g., "frozen", "ready_to_eat") at runtime by parsing the Qualtrics question title text. If any question title is renamed in the Qualtrics survey builder — for example, "Frozen Foods" changed to "Frozen Meals" — the derived key will no longer match the expected embedded data variable name, and preselection for that entire category will break silently. Any renaming of question titles must be followed by a corresponding update to the key derivation logic in the JavaScript.
 
-**No end-to-end test has been completed.** The registry and preselection logic have been constructed and reviewed at the code level, but no full end-to-end test in Qualtrics preview mode has been run through all four basket conditions verifying that each item pre-selects correctly. All four conditions (healthy_a, healthy_b, unhealthy_a, unhealthy_b) should be tested before the survey goes live, with particular attention to FRZ12 and the four corrected Bakery labels noted in Section 9.
+**No end-to-end test has been completed.** The registry and preselection logic have been constructed and reviewed at the code level, but no full end-to-end test in Qualtrics preview mode has been run through all three basket conditions verifying that each item pre-selects correctly. All three conditions (healthy, neutral, unhealthy) should be tested before the survey goes live, with particular attention to FRZ12, the two false positives identified in Section 8.5, and the four corrected Bakery labels noted in Section 9.
 
 ---
 
 ## 11. Maintenance Workflow
 
-When item labels change in Qualtrics, the reconciliation pipeline must be re-run to keep the registry accurate. The process is: open the survey in Qualtrics preview mode, open the browser developer console, run `export qualtrics labels via console.js` by pasting its contents into the console, copy the JSON output, paste it into the "qualtrics" tab of the master Excel spreadsheet, then run `python build_registry.py` from the project directory. The script will regenerate the ITEM_REGISTRY JavaScript object, which should then be copied and pasted to replace the existing registry in the Q1 Qualtrics JavaScript panel.
+### Standard registry rebuild
 
-When new items are added to the survey, the corresponding row must first be added to the appropriate category tab in the Excel spreadsheet, providing at minimum an ItemID, a product name, a health tag, and ideally a Final Label value. A basket assignment row for the new item must also be added to the baskets tab. The Qualtrics labels export should then be re-run to capture the new item's rendered text, and `build_registry.py` should be executed. If the new item's Excel text and Qualtrics label are similar enough for fuzzy matching to succeed, no further action is needed. If the fuzzy match fails — which will be reported in the script's output — create or update a `label_overrides` sheet in an overrides Excel file with the ItemID and correct Qualtrics label, then re-run with `python build_registry.py --overrides your_fixes.xlsx`.
+The normal build command after any data change:
 
-When basket assignments need to change for any category, edit the `Y` markers directly in the baskets tab of the master Excel spreadsheet and re-run `python build_registry.py`. No code changes are required. This applies equally to Bakery, Dairy, and all eight new categories — the baskets tab is the single place where all basket decisions live.
+```
+python build_registry.py --overrides bakery_dairy_overrides.xlsx
+```
 
-When label overrides need to change — for example, if a Qualtrics item name changes and fuzzy matching no longer resolves it correctly — update the `label_overrides` sheet in the overrides Excel file and re-run with the `--overrides` flag. The overrides file itself should be kept in the project folder and committed to version control alongside the script.
+This reads the `qualtrics` tab (label text), all 10 category tabs (item metadata), and the `baskets` tab (Y markers), then patches `condition question and item metada registry.js` with a fresh ITEM_REGISTRY. The resulting JS file is pasted into the Q1 Qualtrics JavaScript panel.
+
+### When basket assignments change
+
+Edit the `Y` markers directly in the `baskets` tab of the Excel file (columns: `ItemID | Category | Label | Tag | Healthy | Neutral | Unhealthy`) and re-run the standard build. No code changes are required. This applies equally to all 10 categories — the baskets tab is the single place where all basket decisions live.
+
+If the basket design changes at the whole-condition level (Imogen revises which items belong in Healthy / Neutral / Unhealthy), update the `default conditions` tab and re-run `--populate-baskets` to regenerate the baskets tab, then run the standard build:
+
+```
+python build_registry.py --populate-baskets
+python build_registry.py --overrides bakery_dairy_overrides.xlsx
+```
+
+Review the `--populate-baskets` console output carefully for any fuzzy match warnings before accepting the updated baskets tab.
+
+### When item labels change in Qualtrics
+
+1. Open the survey in Qualtrics **Preview** mode
+2. Open the browser developer console
+3. Paste and run `export qualtrics labels via console.js`
+4. Copy the JSON output into the `qualtrics` tab of the master Excel spreadsheet
+5. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
+6. Paste the updated JS into Q1
+
+### When new items are added
+
+1. Add a row to the relevant category tab in the Excel file (ItemID, Product Name, Tag, Final Label)
+2. Add a Y-marker row for the new item to the `baskets` tab
+3. Re-export Qualtrics labels (steps 1–4 above)
+4. Run `python build_registry.py --overrides bakery_dairy_overrides.xlsx`
+5. If the script warns `no confident match for <ItemID>`, add the item to `bakery_dairy_overrides.xlsx` (or a new overrides file) and re-run with `--overrides`
+
+### When label overrides need to change
+
+Update the `label_overrides` sheet in `bakery_dairy_overrides.xlsx` and re-run with `--overrides bakery_dairy_overrides.xlsx`. The overrides file is committed to version control alongside the script.
