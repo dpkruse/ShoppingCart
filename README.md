@@ -323,8 +323,9 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | **FRZ12 label uncertain** — "Chocolate icecream" was assigned by elimination (only ice cream label unaccounted for); Final label was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
-| 2 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test before data collection |
-| 3 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
+| 1 | **Q1 JS not yet deployed** — updated `condition question and item metada registry.js` not yet pasted into Qualtrics Q1 (Imogen's account timed out 9 May 2026) | Paste JS into Q1 panel (above addOnReady) when account is available |
+| 2 | **FRZ12 label uncertain** — "Chocolate icecream" assigned by elimination; Excel entry was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
+| 3 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test before data collection |
+| 4 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).
