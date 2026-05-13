@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-05-13 — Cart Summary Fix, Custom Continue Button, Folder Cleanup
+
+### Summary
+Fixed the cart summary question showing pre-selected basket defaults instead of the participant's actual final choices. Replaced the native Qualtrics Next button with a custom sidebar Continue button that enforces the 30-item minimum. Cleaned up the repo root by moving 8 retired files to `archive/`. Created new documentation files.
+
+### Added
+- `cart summary question.html` — summary table HTML (paste into Qualtrics summary question body); was previously regenerated from scratch each session
+- `docs/basket-build-process.md` — plain-English step-by-step guide for Imogen: edit baskets tab, run build, paste to Qualtrics, test
+- `docs/session-handover-2026-05-13.md` — full session handover covering what's working, what's pending, all bug root causes and fixes
+- `archive/README.md` — explains all retired files moved to archive and why
+
+### Changed
+- `condition question and item metada registry.js` — `applyAllPreselections` now explicitly syncs DOM (`$cb.prop("checked")`) after every `setChoiceValue()` call; radio change handler now checks `window._pageSubmitting` flag before firing to prevent rogue preselection during page submission
+- `Q14 Bakery Question and loader.js` — native Next button hidden; custom `#cart-next-btn` sidebar button added (grey/inactive until 30 items, green/active at 30); `isChoiceSelected()` now reads DOM only (`$cb.prop("checked")`); `setEmbeddedData` removed from `updateDisplay()` (embedded data written only in `addOnPageSubmit`); `addOnPageSubmit` restored and sets `window._pageSubmitting = true`
+- `Other categories 9 to 10 question.js` — same `isChoiceSelected` DOM fix; same `setEmbeddedData` removal; same `addOnPageSubmit` with `_pageSubmitting` flag
+- `cart summary question.html` — grand total cell changed from hardcoded `—` to `${e://Field/total_items}`
+- `README.md` — file structure updated; archive files removed; new docs files listed; deployment and workflow sections revised
+- 8 retired files moved to `archive/` (see `archive/README.md`)
+
+### Fixed
+- **BUG: Cart summary showing preselection defaults instead of actual participant choices** — three root causes: (1) `Qualtrics.SurveyEngine.addOnNextButtonClick` not available in this Qualtrics version — TypeError halted Q14 script before `addOnPageSubmit` could register; (2) `getChoiceValue()` vs DOM split-brain — user clicks updated DOM but `getChoiceValue()` returned preselection state; (3) rogue `applyAllPreselections` during page submission — Qualtrics fires an internal radio `change` event during submit, triggering `applyAllPreselections` → `updateDisplay` → `setEmbeddedData(0)` milliseconds after `addOnPageSubmit` wrote correct values
+- **BUG: 30-item minimum not enforced** — native Next button could not be intercepted reliably in this Qualtrics version; replaced with custom sidebar button
+- **BUG: Summary grand total showing `—`** — piped text reference missing from HTML
+
+### Open Items
+- FRZ12 label ("Chocolate icecream") assigned by elimination — verify in Qualtrics preview
+- `[DEBUG Submit]` console.log lines still in production JS (both Q14 and Other categories) — remove before live data collection
+- Q1 JS not yet deployed to Imogen's live Qualtrics account (account timed out 9 May)
+- No full end-to-end test (all 3 conditions, 30 items → summary) completed in live survey
+- `sec` variable derived from question title text — verify all Q15–Q23 titles match expected values
+
+---
+
 ## 2026-05-08 — Registry Build: All 10 Categories
 
 ### Summary

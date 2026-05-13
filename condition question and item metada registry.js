@@ -141,7 +141,7 @@ window.ITEM_REGISTRY = {
     "Beef burgers pattie":      { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: true  } },
     "Lamb burger":              { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: false } },
     "Beef Bbq burger":          { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: false } },
-    "Kransky bite":             { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: false } },
+    "Kransky bite":             { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: true  } },
     "Beef brisket burgers":     { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: false } },
     "Beef chevap":              { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: false } },
     "Deli continental chorizo": { category: "meat_seafood", tag: "unhealthy", preselect: { healthy: false, neutral: false, unhealthy: true  } },
@@ -287,10 +287,12 @@ window.applyAllPreselections = function(condition) {
 
         // Clear all checkboxes first
         $q.find("input[type='checkbox']").each(function() {
-            var choiceId = jQuery(this).attr("choiceid");
+            var $cb = jQuery(this);
+            var choiceId = $cb.attr("choiceid");
             if (choiceId) {
                 try { engine.setChoiceValue(choiceId, false); } catch(e) {}
             }
+            $cb.prop("checked", false);
         });
 
         // Apply registry pre-selections
@@ -298,8 +300,9 @@ window.applyAllPreselections = function(condition) {
         var missing = [];
 
         $q.find("input[type='checkbox']").each(function() {
-            var choiceId = jQuery(this).attr("choiceid");
-            var label = window.getItemLabel(jQuery(this));
+            var $cb = jQuery(this);
+            var choiceId = $cb.attr("choiceid");
+            var label = window.getItemLabel($cb);
             var item = window.ITEM_REGISTRY[label];
 
             if (item && item.preselect && item.preselect[condition]) {
@@ -309,6 +312,7 @@ window.applyAllPreselections = function(condition) {
                 } catch(e) {
                     console.error("setChoiceValue failed for:", label, e);
                 }
+                $cb.prop("checked", true);
             } else if (!item) {
                 missing.push(label);
             }
@@ -341,8 +345,11 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         return label.toLowerCase().replace(/\W+/g, "_").replace(/^_|_$/g, "");
     }
 
-    // Apply on change
+    // Apply on change — guard against Qualtrics firing a spurious change event
+    // during page submission (which would trigger applyAllPreselections and overwrite
+    // embedded data after addOnPageSubmit has already written the correct values).
     $q.on("change", "input[type='radio']", function() {
+        if (window._pageSubmitting) return;
         var condition = getConditionKey(jQuery(this));
         console.log("Condition changed to:", condition);
         Qualtrics.SurveyEngine.setEmbeddedData("condition", condition);

@@ -40,9 +40,21 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                     '</div>' +
                     '<div id="cart-health" style="margin-bottom:10px;font-size:13px;"></div>' +
                     '<ul id="selected-items" style="padding-left:18px;margin:0;font-size:13px;"></ul>' +
+                    '<button id="cart-next-btn" type="button" ' +
+                         'style="width:100%;margin-top:14px;padding:10px;background:#ccc;color:#fff;' +
+                         'border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:not-allowed;">' +
+                        'Continue (0 / 30 selected)' +
+                    '</button>' +
                 '</div>' +
             '</div>'
         );
+
+        // Hide native Next button — our custom sidebar button handles advancement.
+        self.hideNextButton();
+        jQuery('#cart-next-btn').on('click', function() {
+            if (!jQuery(this).data('ready')) return;
+            try { self.clickNextButton(); } catch(e) { jQuery('#NextButton').show().click(); }
+        });
 
         // Sticky sidebar via margin-top on scroll.
         // position:sticky breaks in Qualtrics when an ancestor has overflow:hidden.
@@ -71,14 +83,11 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                   sec.charAt(0).toUpperCase() + sec.slice(1) + ': <span id="count-' + qid + '">0</span> selected</div>');
     }
 
-    // --- Check if a single checkbox is selected via Qualtrics API ---
-    // setChoiceValue() updates Qualtrics' internal state but does NOT reliably set the
-    // DOM :checked attribute, so we must use getChoiceValue() for preselected items.
+    // --- Check if a single checkbox is selected ---
+    // applyAllPreselections explicitly syncs $cb.prop("checked") after every setChoiceValue()
+    // call, so the DOM is always the authoritative state for both preselected and
+    // user-modified items. User clicks also update the DOM directly.
     function isChoiceSelected(engine, $cb) {
-        var choiceId = $cb.attr("choiceid");
-        if (engine && choiceId) {
-            try { return !!engine.getChoiceValue(choiceId); } catch(e) {}
-        }
         return $cb.prop("checked");
     }
 
@@ -187,6 +196,18 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
         jQuery("#selected-items").html(html);
 
+        // Update custom Next button
+        var $btn = jQuery('#cart-next-btn');
+        if ($btn.length) {
+            if (atMax) {
+                $btn.text('Continue →').data('ready', true)
+                    .css({ background: '#2d7a2d', cursor: 'pointer' });
+            } else {
+                $btn.text('Continue (' + total + ' / 30 selected)').data('ready', false)
+                    .css({ background: '#ccc', cursor: 'not-allowed' });
+            }
+        }
+
         // Write embedded data
         Qualtrics.SurveyEngine.setEmbeddedData("health_score", scorePercent);
         Qualtrics.SurveyEngine.setEmbeddedData("total_items", total);
@@ -205,11 +226,6 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         });
 
         jQuery("#count-" + qid).text(count);
-        try {
-            Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", count);
-            Qualtrics.SurveyEngine.setEmbeddedData(sec + "_labels", items.join(", "));
-        } catch(e) {}
-
         updateSidebar();
         enforceLimit();
     }
@@ -229,44 +245,13 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
     // Initial display
     updateDisplay();
-});
 
-// Prevent advancing past this page until exactly 30 items are selected.
-// addOnNextButtonClick fires when the participant clicks Next; returning false
-// blocks the page advance and keeps focus on the survey.
-Qualtrics.SurveyEngine.addOnNextButtonClick(function() {
-    var total = 0;
-    jQuery(".shopping-category-question").each(function() {
-        var $catQ = jQuery(this);
-        var catQid = $catQ.attr("id");
-        var engine = (window._questionEngines || {})[catQid];
-        $catQ.find("input[type='checkbox']").each(function() {
-            var $cb = jQuery(this);
-            var choiceId = $cb.attr("choiceid");
-            var isSelected = false;
-            if (engine && choiceId) {
-                try { isSelected = !!engine.getChoiceValue(choiceId); } catch(e) { isSelected = $cb.prop("checked"); }
-            } else {
-                isSelected = $cb.prop("checked");
-            }
-            if (isSelected) total++;
-        });
-    });
-    if (total < 30) {
-        jQuery("#cart-requirement")
-            .show()
-            .css({ "border-color": "#c0392b", "background": "#fff0f0", "color": "#c0392b" })
-            .text("You must select exactly 30 items before continuing. (" + total + " selected so far)");
-        document.getElementById("cart-requirement").scrollIntoView({ behavior: "smooth", block: "center" });
-        return false;
-    }
 });
 
 Qualtrics.SurveyEngine.addOnPageSubmit(function() {
-    var engine = (window._questionEngines || {})[this.questionId];
+    window._pageSubmitting = true;
     var qid = this.questionId;
     var $q = jQuery("#" + qid);
-
     var qLabel = "";
     try { qLabel = this.getQuestionInfo().QuestionText; } catch(e) {}
     if (!qLabel) qLabel = "unknown";
@@ -275,29 +260,15 @@ Qualtrics.SurveyEngine.addOnPageSubmit(function() {
                   .replace(/\W+/g, "_")
                   .replace(/^_+|_+$/g, "")
                   .replace(/_+/g, "_");
-
     var count = 0;
     var items = [];
-    $q.find("input[type='checkbox']").each(function() {
-        var $cb = jQuery(this);
-        var choiceId = $cb.attr("choiceid");
-        var isSelected = false;
-        if (engine && choiceId) {
-            try { isSelected = !!engine.getChoiceValue(choiceId); } catch(e) { isSelected = $cb.prop("checked"); }
-        } else {
-            isSelected = $cb.prop("checked");
-        }
-        if (!isSelected) return;
+    $q.find("input[type='checkbox']:checked").each(function() {
         count++;
-        var id = $cb.attr("id");
-        var label = id ? jQuery("label[for='" + id + "']").filter("[id$='-label']").text().trim() : "";
-        if (!label) label = $cb.closest("li").text().trim();
-        items.push(label || "Item");
+        items.push(window.getItemLabel(jQuery(this)));
     });
-
+    console.log("[DEBUG Submit] " + sec + " count=" + count + " labels=" + items.join(", "));
     Qualtrics.SurveyEngine.setEmbeddedData(sec + "_count", count);
     Qualtrics.SurveyEngine.setEmbeddedData(sec + "_labels", items.join(", "));
-    console.log("onPageSubmit:", sec, count, "items");
 });
 
 Qualtrics.SurveyEngine.addOnUnload(function() {
