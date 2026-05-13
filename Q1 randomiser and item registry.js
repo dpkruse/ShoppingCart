@@ -431,6 +431,7 @@ Qualtrics.SurveyEngine.addOnload(function() {});
 
 Qualtrics.SurveyEngine.addOnReady(function() {
     if (window._restoreFromEmbedded) return;
+    var qid = this.questionId;
     var condition = Qualtrics.SurveyEngine.getEmbeddedData('condition');
     if (!condition) {
         console.error('ShoppingCart: condition embedded data is missing — randomizer may not be configured in Survey Flow.');
@@ -441,8 +442,9 @@ Qualtrics.SurveyEngine.addOnReady(function() {
     var age = Qualtrics.SurveyEngine.getEmbeddedData('respondent_age');
     window.DEBUG_MODE = (String(age).trim() === '99');
 
+    var $body = jQuery('#' + qid + ' .QuestionBody');
     if (window.DEBUG_MODE) {
-        jQuery('.QuestionBody').append(
+        $body.append(
             '<div style="background:#fffbe6;border:1px solid #f0c040;padding:6px 10px;' +
             'font-size:13px;margin-top:10px;border-radius:4px;">' +
             '&#x1F6A7; DEBUG: condition = <strong>' + condition + '</strong></div>'
@@ -451,7 +453,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         var ageInt = parseInt(age, 10);
         var fact = AGE_FACTS[ageInt] || 'Really?? I don\'t believe you.';
         Qualtrics.SurveyEngine.setEmbeddedData('age_fact', fact);
-        jQuery('.QuestionBody').append(
+        $body.append(
             '<div style="font-size:16px;color:#555;margin-top:8px;">' + fact + '</div>'
         );
     }
