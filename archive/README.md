@@ -12,6 +12,7 @@ Files moved here are no longer part of the active workflow. They are kept for re
 | `label-review.csv` | Intermediate artefact from label reconciliation work | Superseded; all corrections applied to the Excel file directly |
 | `qualtrics_export.json` | Point-in-time export of Qualtrics-rendered label text (exported 8 May 2026) | Stale — re-export using `export qualtrics labels via console.js` if labels change |
 | `registry-converter.html` | Legacy browser-based tool for generating registry entries from CSV | Superseded by `build_registry.py` |
+| `baskets.csv` | Supplementary label source for `--populate-baskets` label matching on Bakery/Dairy | Redundant — all 10 category tabs now have `Label` col D; `--populate-baskets` matches directly from Excel |
 | `Qualtrics.SurveyEngine.js` | Reference copy of the Qualtrics JavaScript API | Reference only |
 | `Justification (original Imo).xlsx` | Original pre-development spreadsheet from Imogen | Superseded by `Combined Justification 8.05.2026.xlsx` |
 | `Default Condition Cart Items.xlsx` | Early draft of basket condition item lists | Superseded by the `baskets` tab in the master Excel file |

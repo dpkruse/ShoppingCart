@@ -99,10 +99,6 @@ ShoppingCart/
 │         • 'Research Approach' tab — comparison of this study vs. 7 others
 │         • Other research tabs (Power Analysis, Sum of Primary Studies)
 │
-├── baskets.csv
-│       Supplementary label source used by build_registry.py for Bakery/Dairy
-│       label matching. Do not delete.
-│
 ├── docs/
 │   ├── basket-build-process.md — Step-by-step guide for updating baskets and deploying
 │   ├── session-handover-2026-05-13.md — Full session handover (start here)
