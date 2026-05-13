@@ -350,6 +350,18 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         return;
     }
     console.log('Condition assigned by randomizer:', condition);
+
+    var age = Qualtrics.SurveyEngine.getEmbeddedData('respondent_age');
+    window.DEBUG_MODE = (String(age).trim() === '99');
+
+    if (window.DEBUG_MODE) {
+        jQuery('.QuestionBody').append(
+            '<div style="background:#fffbe6;border:1px solid #f0c040;padding:6px 10px;' +
+            'font-size:13px;margin-top:10px;border-radius:4px;">' +
+            '&#x1F6A7; DEBUG: condition = <strong>' + condition + '</strong></div>'
+        );
+    }
+
     // Category questions register their engines in their own addOnload, which fires
     // after Q1's addOnReady. Poll until all 10 are registered, then apply.
     var attempts = 0;
