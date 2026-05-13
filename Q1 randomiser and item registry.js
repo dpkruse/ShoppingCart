@@ -452,7 +452,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         var fact = AGE_FACTS[ageInt] || 'Really?? I don\'t believe you.';
         Qualtrics.SurveyEngine.setEmbeddedData('age_fact', fact);
         jQuery('.QuestionBody').append(
-            '<div style="font-size:13px;color:#555;margin-top:8px;">' + fact + '</div>'
+            '<div style="font-size:16px;color:#555;margin-top:8px;">' + fact + '</div>'
         );
     }
 
