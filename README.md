@@ -116,7 +116,8 @@ ShoppingCart/
 │         • Other research tabs (Power Analysis, Sum of Primary Studies)
 │
 ├── docs/
-│   ├── session-handover-2026-05-14c.md — Latest session handover (start here) ⬅ NEXT
+│   ├── session-handover-2026-05-14d.md — Latest session handover (start here) ⬅ NEXT
+│   ├── session-handover-2026-05-14c.md — Previous session handover
 │   ├── basket-build-process.md — Step-by-step guide for updating baskets and deploying
 │   ├── session-handover-2026-05-14b.md — Previous session handover
 │   ├── session-handover-2026-05-14.md — Earlier session handover
@@ -367,6 +368,8 @@ The JavaScript writes the following embedded data fields to Qualtrics on submiss
 
 Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat_seafood`, `frozen`, `pantry`, `ready_to_eat`, `vegetables`
 
+> **Survey Flow note:** `{category}_count` and `{category}_labels` fields must be declared in the Qualtrics Survey Flow Embedded Data element to appear in the response data export. The JS writes them on submit regardless, but Qualtrics only includes fields in the export if they are declared. All 10 `_labels` fields are now declared (done 2026-05-14).
+
 ---
 
 ## Known Open Items
@@ -378,8 +381,9 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 | 3 | ✅ **FRZ12 label verified** — "Chocolate icecream" confirmed correct; no registry mismatch | Done 2026-05-14 |
 | 4 | ✅ **End-to-end test passed** — all 3 conditions, 30 items, summary, Go Back, resubmit all working | Done 2026-05-14 |
 | 5 | ✅ **Debug mode (age=99)** — condition label and health score visible only to researcher; age fact shown to all normal participants | Done 2026-05-14 |
-| 6 | **Deploy updated JS to Qualtrics** — Q1, Q14, and Other categories all updated this session; must be re-pasted | Before next test |
-| 7 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
-| 8 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
+| 6 | ✅ **`{category}_labels` declared in Survey Flow** — all 10 per-category item label fields now appear in the Qualtrics data export | Done 2026-05-14 |
+| 7 | **Deploy updated JS to Qualtrics** — Q1, Q14, and Other categories updated in previous session; must be re-pasted if not already done | Before next test |
+| 8 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
+| 9 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).

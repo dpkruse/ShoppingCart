@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-14 — Declare Per-Category Item Labels in Survey Flow
+
+### Changed
+- **Qualtrics Survey Flow** — declared the 10 `{category}_labels` embedded data fields in the Survey Flow Embedded Data element so they appear in the Qualtrics response data export. No JS changes required; the fields were already being written by `addOnPageSubmit` in Q14 and Other categories JS — they just weren't visible in the export until declared.
+
+Fields added to Survey Flow:
+`bakery_labels`, `dairy_eggs_fridge_labels`, `drinks_labels`, `frozen_labels`, `fruit_labels`, `meat_seafood_labels`, `pantry_labels`, `ready_to_eat_labels`, `snacks_labels`, `vegetables_labels`
+
+---
+
 ## 2026-05-14 — Debug Mode (age=99) and Age Fact Display
 
 ### Added
