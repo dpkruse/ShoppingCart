@@ -4,6 +4,15 @@
 
 window._questionEngines = window._questionEngines || {};
 
+// Detect back-navigation: if the user has already advanced past the shopping page,
+// restore their saved choices instead of re-applying condition preselections.
+window._restoreFromEmbedded = false;
+try {
+    if (Qualtrics.SurveyEngine.getEmbeddedData('_selections_saved') === 'true') {
+        window._restoreFromEmbedded = true;
+    }
+} catch(e) {}
+
 // ITEM_REGISTRY — 240 items across 10 categories
 // Basket conditions: healthy, neutral, unhealthy
 // Source: Excel baskets tab (populated from "default conditions" tab via --populate-baskets)
@@ -345,23 +354,27 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         return label.toLowerCase().replace(/\W+/g, "_").replace(/^_|_$/g, "");
     }
 
-    // Apply on change — guard against Qualtrics firing a spurious change event
-    // during page submission (which would trigger applyAllPreselections and overwrite
-    // embedded data after addOnPageSubmit has already written the correct values).
+    // Apply on change — skip if submitting (prevents rogue overwrite) or if restoring
+    // saved state from a back-navigation (categories handle their own restore).
     $q.on("change", "input[type='radio']", function() {
         if (window._pageSubmitting) return;
         var condition = getConditionKey(jQuery(this));
         console.log("Condition changed to:", condition);
         Qualtrics.SurveyEngine.setEmbeddedData("condition", condition);
-        window.applyAllPreselections(condition);
+        if (!window._restoreFromEmbedded) {
+            window.applyAllPreselections(condition);
+        }
     });
 
-    // If a radio is already selected on load (e.g. back-navigation), apply it
+    // If a radio is already selected on load (e.g. back-navigation), apply preselections
+    // only if this is a fresh load — not a back-navigation (categories restore themselves).
     var $preChecked = $q.find("input[type='radio']:checked");
     if ($preChecked.length) {
         var condition = getConditionKey($preChecked);
         Qualtrics.SurveyEngine.setEmbeddedData("condition", condition);
-        window.applyAllPreselections(condition);
+        if (!window._restoreFromEmbedded) {
+            window.applyAllPreselections(condition);
+        }
     }
 });
 

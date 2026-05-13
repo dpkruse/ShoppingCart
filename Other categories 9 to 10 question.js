@@ -218,6 +218,24 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         enforceLimit();
     }
 
+    // Restore saved checkbox state from embedded data (back-navigation path).
+    // Only fires when _restoreFromEmbedded is true (set in Q1 global scope).
+    function restoreFromEmbedded() {
+        var saved = Qualtrics.SurveyEngine.getEmbeddedData(sec + '_labels') || '';
+        if (!saved.trim()) return;
+        var labelSet = {};
+        saved.split(',').forEach(function(l) { labelSet[l.trim().toLowerCase()] = true; });
+        $q.find("input[type='checkbox']").each(function() {
+            var $cb = jQuery(this);
+            var label = (window.getItemLabel($cb) || '').trim().toLowerCase();
+            if (labelSet[label]) {
+                var choiceId = $cb.attr('choiceid');
+                if (choiceId) { try { self.setChoiceValue(choiceId, true); } catch(e) {} }
+                $cb.prop('checked', true);
+            }
+        });
+    }
+
     // Mark this question so getAllSelections() can find it
     $q.addClass("shopping-category-question");
 
@@ -231,7 +249,10 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         updateDisplay();
     });
 
-    // Initial display
+    // Initial display — restore saved state on back-navigation; preselections handle fresh loads
+    if (window._restoreFromEmbedded) {
+        restoreFromEmbedded();
+    }
     updateDisplay();
 });
 
