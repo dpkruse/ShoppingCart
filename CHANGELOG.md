@@ -68,3 +68,57 @@ Full ITEM_REGISTRY rebuilt from scratch via `build_registry.py` to cover all 10 
 - Basket assignments for 8 new categories (auto-assigned, seed=42) not yet reviewed by researcher
 - baskets tab in Excel not back-filled with 8 new categories' assignments
 - No end-to-end test in Qualtrics preview completed
+
+---
+
+## Early Version History (pre-changelog, reconstructed)
+
+> The following versions were built before formal change tracking began. Recorded retrospectively for context.
+
+---
+
+## V4 — 7 May 2026 _(in testing at time of writing)_
+
+Built on top of the working V3 codebase.
+
+### Added
+- Item metadata registry object (`ITEM_REGISTRY`) derived from spreadsheet — see `Combined Justification` tab in the master Excel file
+- Three-condition basket model: Healthy / Neutral / Unhealthy pre-selections
+- Registry build pipeline (`build_registry.py`) — spreadsheet → JS registry
+
+### Notes
+- Item label in the spreadsheet must match the Qualtrics-rendered label exactly for the registry lookup to work
+- This was the version actively being debugged and refined in the May 2026 sessions
+
+---
+
+## V3 — 7 May 2026
+
+### Added
+- 30-item selection limit enforced across all categories
+- Running cart total displayed to participant
+
+---
+
+## V2
+
+### Fixed
+- JavaScript errors present in V1
+- Default (pre-selected) choices now appear correctly in full survey preview
+
+### Added
+- Cart summary page showing all selections at end of survey
+
+---
+
+## V2.1 — abandoned development branch
+
+Attempted to reduce code duplication by moving shared JS logic into a single common location rather than repeating it across all 10 category questions. Hit Qualtrics JavaScript scoping issues that could not be resolved cleanly. Branch abandoned and reverted to V2.
+
+> Note: the duplication would not have been necessary if the shopping basket had been built as one large question rather than 10 separate category questions.
+
+---
+
+## V1 — initial build
+
+Initial working implementation of the online grocery shopping cart survey in Qualtrics.

@@ -182,6 +182,38 @@ python build_registry.py --overrides my_overrides.xlsx
 
 ---
 
+## Helper Scripts
+
+### `export qualtrics labels via console.js`
+
+A browser console snippet that exports all rendered checkbox label text from the live Qualtrics survey. This is the **authoritative source** of label text — what Qualtrics actually displays in the DOM, which may differ from the product names in the spreadsheet.
+
+**When to use:** Any time an item label may have changed in Qualtrics (product renamed, new item added, or you just want to verify the `qualtrics` tab is current).
+
+**How to run:**
+
+1. Open the survey in Qualtrics **Preview** mode
+2. Open the browser developer console (F12 → Console tab)
+3. Paste the entire contents of `export qualtrics labels via console.js` and press Enter
+4. A file named `qualtrics_export.json` downloads automatically
+5. Move it to the repo root and run:
+   ```
+   python build_registry.py --update-qualtrics qualtrics_export.json
+   ```
+   This writes all labels into the `qualtrics` tab of the Excel master file.
+
+**What it exports:** All checkbox labels across all 10 category questions, in DOM order, keyed by category. The output is a JSON object — one array of label strings per category name.
+
+---
+
+### `consolidate_labels.py` _(archived — one-off migration, task complete)_
+
+A one-off Python script that migrated label data from multiple "Final label" columns (spread across old versions of the category tabs) into a single `Label` column (col D) on each of the 8 non-Bakery/Dairy category tabs. This was needed because the original spreadsheet had no consistent label column across categories.
+
+Run once in May 2026. Archived at `archive/consolidate_labels.py`. The output (col D populated across all 10 category tabs) is now the permanent state of the Excel master file — this script does not need to be re-run.
+
+---
+
 ## Deploying to Qualtrics
 
 After running `build_registry.py`, deploy the three JS files to Qualtrics:
@@ -297,8 +329,6 @@ Each participant is assigned one of three conditions. Each condition pre-selects
 Items can appear in multiple conditions — a staple like "Cinnamon scroll" may be pre-checked in all three. The basket is defined at the whole-survey level, not per-category.
 
 Basket assignments are specified by Imogen in the `default conditions` tab of the master Excel file and are written to the `baskets` tab by `python build_registry.py --populate-baskets`.
-
-![Default conditions tab — Imogen's basket design (added 9 May 2026)](default%20choices%20for%20baskets%209.05.2026.png)
 
 ---
 
