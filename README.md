@@ -216,7 +216,7 @@ Run once in May 2026. Archived at `archive/consolidate_labels.py`. The output (c
 
 ## Deploying to Qualtrics
 
-After running `build_registry.py`, deploy the three JS files to Qualtrics:
+After running `build_registry.py`, deploy all artefacts to Qualtrics:
 
 ### Q1 — Condition Picker
 
@@ -353,9 +353,11 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | **Q1 JS not yet deployed** — updated `condition question and item metada registry.js` not yet pasted into Qualtrics Q1 (Imogen's account timed out 9 May 2026) | Paste JS into Q1 panel (above addOnReady) when account is available |
+| 1 | **All JS/HTML files not yet deployed** — 5 artefacts need pasting into Qualtrics (see Deploying section) | Deploy when Imogen's account is available |
 | 2 | **FRZ12 label uncertain** — "Chocolate icecream" assigned by elimination; Excel entry was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
-| 3 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test before data collection |
+| 3 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test all 3 conditions with 30 items before data collection |
 | 4 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
+| 5 | **`[DEBUG Submit]` console.log lines still in JS** — noisy in production | Remove from `addOnPageSubmit` in Q14 and Other categories before going live |
+| 6 | **Survey page width** — intro and summary pages wrap on narrow Qualtrics themes | Adjust in Qualtrics Look & Feel → General → Survey Width |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).
