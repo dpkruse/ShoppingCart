@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-14 — Survey Intro Redesign, Back-Navigation State Restore, Summary Custom Buttons
+
+### Added
+- `survey intro question.html` — redesigned welcome/eligibility page for the survey intro question. Replaces plain paragraph text with a green hero banner, gold eligibility checklist (female / likes most foods / no allergies / not vegetarian), blue requirements panel (laptop, quiet room, phone silent), and a green "Ready?" call-to-action strip. All original content preserved. Paste into the HTML body of the intro question.
+- `cart summary question.js` — JavaScript panel for the cart summary question. Hides native Previous/Next buttons and wires the custom Go Back and Submit buttons. Paste into the summary question JS panel.
+
+### Changed
+- `cart summary question.html` — replaced native navigation buttons with custom Go Back (grey, hover tooltip: "Your selections will be restored exactly as you left them") and Submit Survey (green) buttons
+- `Q14 Bakery Question and loader.js` — native Previous button on shopping page now has a hover warning: "Going back will reset your cart and erase all your selections"
+
+### Fixed
+- **BUG: Going back from summary page wiped participant selections** — on back-navigation, Qualtrics reloaded the shopping page and re-fired `applyAllPreselections`, erasing all choices. Fix: `addOnPageSubmit` writes a `_selections_saved` flag; Q1 global scope reads this on load and sets `window._restoreFromEmbedded`; each category's `addOnReady` reads its saved `{sec}_labels` from embedded data and restores the exact checkboxes instead of applying preselections.
+- **BUG: Custom Go Back button unclickable** — `<script>` tags inside Qualtrics question HTML bodies do not execute reliably; click handlers were never attached. Fix: moved all button JS to a dedicated `cart summary question.js` file for the question's JavaScript panel.
+
+---
+
 ## 2026-05-13 — Cart Summary Fix, Custom Continue Button, Folder Cleanup
 
 ### Summary
