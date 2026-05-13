@@ -1,6 +1,11 @@
 Qualtrics.SurveyEngine.addOnload(function() {});
 
 Qualtrics.SurveyEngine.addOnReady(function() {
+    if (window.DEBUG_MODE === undefined) {
+        var _age = Qualtrics.SurveyEngine.getEmbeddedData('respondent_age');
+        window.DEBUG_MODE = (String(_age).trim() === '99');
+    }
+
     var self = this;
     var qid = this.questionId;
     var maxItems = 30;

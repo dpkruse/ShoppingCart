@@ -449,13 +449,11 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         );
     } else {
         var ageInt = parseInt(age, 10);
-        var fact = AGE_FACTS[ageInt] || '';
-        if (fact) {
-            Qualtrics.SurveyEngine.setEmbeddedData('age_fact', fact);
-            jQuery('.QuestionBody').append(
-                '<div style="font-size:13px;color:#555;margin-top:8px;">' + fact + '</div>'
-            );
-        }
+        var fact = AGE_FACTS[ageInt] || 'Really?? I don\'t believe you.';
+        Qualtrics.SurveyEngine.setEmbeddedData('age_fact', fact);
+        jQuery('.QuestionBody').append(
+            '<div style="font-size:13px;color:#555;margin-top:8px;">' + fact + '</div>'
+        );
     }
 
     // Category questions register their engines in their own addOnload, which fires
