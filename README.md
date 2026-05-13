@@ -116,9 +116,11 @@ ShoppingCart/
 │         • Other research tabs (Power Analysis, Sum of Primary Studies)
 │
 ├── docs/
-│   ├── session-handover-2026-05-14.md — Latest session handover (start here) ⬅ NEXT
+│   ├── session-handover-2026-05-14c.md — Latest session handover (start here) ⬅ NEXT
 │   ├── basket-build-process.md — Step-by-step guide for updating baskets and deploying
-│   ├── session-handover-2026-05-13.md — Previous session handover
+│   ├── session-handover-2026-05-14b.md — Previous session handover
+│   ├── session-handover-2026-05-14.md — Earlier session handover
+│   ├── session-handover-2026-05-13.md — Earlier session handover
 │   ├── DATA_READINESS.md       — Narrative of data engineering decisions
 │   └── plans/
 │       └── 2026-05-08-registry-build.md
@@ -354,6 +356,8 @@ The JavaScript writes the following embedded data fields to Qualtrics on submiss
 | Field | Value |
 |-------|-------|
 | `condition` | Basket condition key (e.g., `healthy`, `neutral`, `unhealthy`) |
+| `respondent_age` | Age entered at Q5 — captured by Survey Flow Set Embedded Data |
+| `age_fact` | Short Wikipedia fact about the respondent's age (written by Q1 JS for non-debug users) |
 | `total_items` | Total items selected across all categories |
 | `healthy_items` | Count of items tagged `healthy` |
 | `unhealthy_items` | Count of items tagged `unhealthy` |
@@ -373,7 +377,9 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 | 2 | ✅ **All artefacts deployed** — 7 files deployed to Imogen's live Qualtrics account | Done 2026-05-14 |
 | 3 | ✅ **FRZ12 label verified** — "Chocolate icecream" confirmed correct; no registry mismatch | Done 2026-05-14 |
 | 4 | ✅ **End-to-end test passed** — all 3 conditions, 30 items, summary, Go Back, resubmit all working | Done 2026-05-14 |
-| 5 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
-| 6 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
+| 5 | ✅ **Debug mode (age=99)** — condition label and health score visible only to researcher; age fact shown to all normal participants | Done 2026-05-14 |
+| 6 | **Deploy updated JS to Qualtrics** — Q1, Q14, and Other categories all updated this session; must be re-pasted | Before next test |
+| 7 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
+| 8 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-05-14 — Debug Mode (age=99) and Age Fact Display
+
+### Added
+- **Debug mode via magic age** — entering age 99 at Q5 (demographics) activates `window.DEBUG_MODE` throughout the shopping task. Debug users see:
+  - A yellow banner on Q1 showing the assigned basket condition (e.g. "🚧 DEBUG: condition = unhealthy")
+  - A condition badge (`#cart-debug`) in the cart sidebar on every shopping page
+  - The full cart health breakdown (`#cart-health`) in the sidebar, updated on every checkbox change
+- **Age-fact lookup table** — for all normal participants (age 18–98), a short fact about their age (sourced from Wikipedia number pages) is displayed on Q1 and written to the `age_fact` embedded data field. Out-of-range ages show "Really?? I don't believe you."
+- **`respondent_age` embedded data field** — added to Survey Flow as a Set Embedded Data element immediately after the Demographics block: `respondent_age = ${q://QID5/ChoiceTextEntryValue}`
+
+### Changed
+- `Q1 randomiser and item registry.js` — added `AGE_FACTS` lookup object (ages 18–98); `addOnReady` now reads `respondent_age`, sets `window.DEBUG_MODE`, and injects either the debug banner or the age fact into Q1's own question body (scoped to `#qid .QuestionBody` to avoid leaking into category questions on the same page)
+- `Q14 Bakery Question and loader.js` — added `#cart-debug` div to sidebar HTML; `updateSidebar()` now gates `#cart-health` render behind `window.DEBUG_MODE`; `addOnReady` re-derives `window.DEBUG_MODE` from embedded data on page load (required because `window` context resets between Qualtrics pages)
+- `Other categories 9 to 10 question.js` — same `DEBUG_MODE` re-derivation at top of `addOnReady`; same `if (window.DEBUG_MODE)` gate around `#cart-health` render in `updateSidebar()`
+
+### Fixed
+- **BUG: `window.DEBUG_MODE` not persisting to shopping page** — `window` variables set by Q1's JS are cleared when Qualtrics navigates to the shopping page (separate page context). Fix: Q14 and Other categories now re-read `respondent_age` and re-derive `DEBUG_MODE` at the top of their own `addOnReady`.
+- **BUG: Age fact injected into every category question** — `jQuery('.QuestionBody')` matched all question bodies on the page. Fix: selector scoped to `jQuery('#' + qid + ' .QuestionBody')`.
+- **BUG: Cart health still showing for non-debug users** — only Q14's `updateSidebar()` was gated; Q15–Q23 each define their own local `updateSidebar()` and were still writing to `#cart-health`. Fix: gate added to Other categories JS too.
+
+---
+
 ## 2026-05-14 — Blind Basket Randomizer
 
 ### Added
