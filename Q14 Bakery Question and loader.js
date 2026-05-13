@@ -38,6 +38,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
                          'background:#fffbe6;border:1px solid #ffe58f;border-radius:4px;padding:4px 8px;">' +
                         'Please select exactly 30 items to continue.' +
                     '</div>' +
+                    '<div id="cart-debug" style="margin-bottom:6px;font-size:12px;"></div>' +
                     '<div id="cart-health" style="margin-bottom:10px;font-size:13px;"></div>' +
                     '<ul id="selected-items" style="padding-left:18px;margin:0;font-size:13px;"></ul>' +
                     '<button id="cart-next-btn" type="button" ' +
@@ -75,6 +76,14 @@ Qualtrics.SurveyEngine.addOnReady(function() {
             ));
             sidebar.style.marginTop = mt + "px";
         });
+    }
+
+    if (window.DEBUG_MODE) {
+        var dbgCondition = Qualtrics.SurveyEngine.getEmbeddedData('condition');
+        jQuery('#cart-debug').html(
+            '<span style="background:#fffbe6;border:1px solid #f0c040;padding:2px 6px;' +
+            'border-radius:3px;">&#x1F6A7; ' + dbgCondition + '</span>'
+        );
     }
 
     // Move this question into the main panel
@@ -171,12 +180,14 @@ Qualtrics.SurveyEngine.addOnReady(function() {
             jQuery("#cart-requirement").show();
         }
 
-        jQuery("#cart-health").html(
-            '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
-            '<span style="color:#888;">&#x26AA; Neutral: ' + neutralCount + '</span> &nbsp;' +
-            '<span style="color:#c0392b;">&#x1F534; Unhealthy: ' + unhealthyCount + '</span><br>' +
-            '<strong>Health score: ' + scorePercent + '%</strong>'
-        );
+        if (window.DEBUG_MODE) {
+            jQuery("#cart-health").html(
+                '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
+                '<span style="color:#888;">&#x26AA; Neutral: ' + neutralCount + '</span> &nbsp;' +
+                '<span style="color:#c0392b;">&#x1F534; Unhealthy: ' + unhealthyCount + '</span><br>' +
+                '<strong>Health score: ' + scorePercent + '%</strong>'
+            );
+        }
 
         // Group selected items by category for sidebar list.
         // Use entry.item.category when available; fall back to the question's own
