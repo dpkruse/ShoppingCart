@@ -215,6 +215,7 @@ Qualtrics.SurveyEngine.addOnReady(function() {
         Qualtrics.SurveyEngine.setEmbeddedData("health_score", scorePercent);
         Qualtrics.SurveyEngine.setEmbeddedData("total_items", total);
         Qualtrics.SurveyEngine.setEmbeddedData("healthy_items", healthyCount);
+        Qualtrics.SurveyEngine.setEmbeddedData("unhealthy_items", unhealthyCount);
     }
 
     // --- Update this question's own counter + sidebar + limit ---

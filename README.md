@@ -356,6 +356,7 @@ The JavaScript writes the following embedded data fields to Qualtrics on submiss
 | `condition` | Basket condition key (e.g., `healthy`, `neutral`, `unhealthy`) |
 | `total_items` | Total items selected across all categories |
 | `healthy_items` | Count of items tagged `healthy` |
+| `unhealthy_items` | Count of items tagged `unhealthy` |
 | `health_score` | Percentage of selected items that are healthy (0–100) |
 | `{category}_count` | Items selected in that category (e.g., `bakery_count`) |
 | `{category}_labels` | Comma-separated labels for that category (e.g., `bakery_labels`) |
