@@ -80,17 +80,5 @@
     </button>
 </div>
 
-<p style="margin-top:12px; font-size:0.85em; color:#888;">Hover over Go Back to see what happens to your selections.</p>
+<p style="margin-top:12px; font-size:0.85em; color:#888;">Hover over <strong>Go Back</strong> to see what happens to your selections.</p>
 </div>
-
-<script>
-jQuery(function() {
-    jQuery('#PreviousButton, #NextButton').hide();
-    jQuery('#summary-back-btn').on('click', function() {
-        jQuery('#PreviousButton').show().click();
-    });
-    jQuery('#summary-submit-btn').on('click', function() {
-        jQuery('#NextButton').show().click();
-    });
-});
-</script>

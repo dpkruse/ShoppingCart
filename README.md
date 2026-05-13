@@ -75,10 +75,15 @@ ShoppingCart/
 │       Identical logic to Q14 — each question registers itself into
 │       the shared layout created by Q14.
 │
-├── cart summary question.html                       ← paste into summary question
+├── cart summary question.html                       ← paste into summary question HTML body
 │       Paste into the HTML body of the cart summary question (end-of-survey).
 │       Displays the participant's final selections per category using Qualtrics
 │       piped text (${e://Field/...}). Shows actual choices made, not pre-selections.
+│       Contains Go Back and Submit buttons (wired up by cart summary question.js).
+│
+├── cart summary question.js                         ← paste into summary question JS panel
+│       Paste into the JavaScript panel of the cart summary question.
+│       Hides native Previous/Next buttons; wires the custom Go Back and Submit buttons.
 │
 ├── export qualtrics labels via console.js
 │       Run in the browser developer console while previewing the survey.
