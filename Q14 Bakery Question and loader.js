@@ -51,6 +51,9 @@ Qualtrics.SurveyEngine.addOnReady(function() {
 
         // Hide native Next button — our custom sidebar button handles advancement.
         self.hideNextButton();
+
+        // Warn participants that going back will erase their selections.
+        jQuery('#PreviousButton').attr('title', 'Warning: going back will reset your cart and erase all your selections.');
         jQuery('#cart-next-btn').on('click', function() {
             if (!jQuery(this).data('ready')) return;
             try { self.clickNextButton(); } catch(e) { jQuery('#NextButton').show().click(); }
