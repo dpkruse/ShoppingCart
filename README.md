@@ -368,11 +368,11 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | ✅ **Blind basket randomizer** — Q1 changed to Descriptive Text; Survey Flow Randomizer assigns condition blindly; JS reads embedded data and applies preselections with engine-registration timing fix | **Done 2026-05-14** |
-| 2 | **All JS/HTML files not yet deployed** — 6 artefacts + custom CSS need applying in Qualtrics | Deploy when Imogen's account is available |
-| 3 | **FRZ12 label uncertain** — "Chocolate icecream" assigned by elimination; Excel entry was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
-| 4 | **No end-to-end test** — all three basket conditions not yet verified with full 30-item → summary → back flow | Test before data collection |
-| 5 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
-| 6 | **`[DEBUG Submit]` console.log lines still in JS** — noisy in production | Remove from `addOnPageSubmit` in Q14 and Other categories before going live |
+| 1 | ✅ **Blind basket randomizer** — Q1 changed to Descriptive Text; Survey Flow Randomizer assigns condition blindly; JS reads embedded data and applies preselections with engine-registration timing fix | Done 2026-05-14 |
+| 2 | ✅ **All artefacts deployed** — 7 files deployed to Imogen's live Qualtrics account | Done 2026-05-14 |
+| 3 | ✅ **FRZ12 label verified** — "Chocolate icecream" confirmed correct; no registry mismatch | Done 2026-05-14 |
+| 4 | ✅ **End-to-end test passed** — all 3 conditions, 30 items, summary, Go Back, resubmit all working | Done 2026-05-14 |
+| 5 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
+| 6 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).
