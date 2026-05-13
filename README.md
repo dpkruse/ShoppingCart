@@ -135,19 +135,58 @@ ShoppingCart/
 
 ## Requirements
 
-**Python 3.x** with the following package:
-
-```
-pip install openpyxl
-```
-
-No other dependencies. `build_registry.py` uses only `openpyxl`, `difflib` (stdlib), and `argparse` (stdlib).
+`build_registry.py` requires Python with the `openpyxl` package. See the two options below — **Method A** if you already have Python installed, **Method B** if you want a simpler setup with no manual dependency management.
 
 ---
 
 ## Building the Registry
 
-`build_registry.py` reads the master Excel file and rewrites the auto-generated section of `condition question and item metada registry.js`.
+`build_registry.py` reads the master Excel file and rewrites the auto-generated section of `Q1 randomiser and item registry.js`.
+
+### Method A — Run with Python directly
+
+Use this if you have Python 3.x already installed.
+
+**One-time setup:**
+```
+pip install openpyxl
+```
+
+**Run the script:**
+```
+python build_registry.py
+python build_registry.py --populate-baskets
+python build_registry.py --overrides my_overrides.xlsx
+```
+
+---
+
+### Method B — Run with uv (no Python installation needed)
+
+`uv` is a lightweight Python runtime manager. It installs Python and all dependencies automatically the first time you run the script — nothing else to set up.
+
+**One-time install:**
+
+macOS (Terminal):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows (PowerShell):
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**Run the script** (identical on both platforms):
+```
+uv run build_registry.py
+uv run build_registry.py --populate-baskets
+uv run build_registry.py --overrides my_overrides.xlsx
+```
+
+`uv` downloads the correct Python version and `openpyxl` on first run. Subsequent runs are instant.
+
+---
 
 ### Step 1 — Populate the baskets tab (when basket assignments change)
 

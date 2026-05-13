@@ -19,6 +19,9 @@ qualtrics_export.json
 # Claude Code local settings (machine-specific, not project config)
 .claude/settings.local.json
 
+# Claude Code superpowers plugin cache
+docs/superpowers/
+
 # OS
 .DS_Store
 Thumbs.db
