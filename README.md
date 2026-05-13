@@ -23,7 +23,7 @@ An online grocery shopping cart survey built in Qualtrics for nutrition research
 ## How It Works
 
 1. A participant lands on a single Qualtrics page containing all 10 product categories.
-2. JavaScript assigns them one of three **basket conditions** (Healthy, Neutral, or Unhealthy), pre-checking ~25–27 items across all categories to simulate a default shopping cart with a given health composition.
+2. They are randomly assigned one of three **basket conditions** (Healthy, Neutral, or Unhealthy) via the Qualtrics Survey Flow randomizer, which sets the `condition` embedded data field before the shopping page loads. JavaScript reads this and pre-checks ~25–27 items to simulate a default shopping cart. Participants do not know which condition they have been assigned.
 3. The participant freely adds and removes items. A live **Your Cart** sidebar shows their running total, health breakdown, and item list. Selection is capped at **30 items**.
 4. On submission, health score and per-category selections are written as Qualtrics embedded data.
 
@@ -32,9 +32,12 @@ An online grocery shopping cart survey built in Qualtrics for nutrition research
 ## Survey Architecture
 
 ```
-Q1  — Condition Picker
-       └─ Sets basket condition via radio button (or random assignment)
+Q1  — Condition Host (Descriptive Text question — no visible UI)
        └─ Hosts window.ITEM_REGISTRY and all preselection logic (global JS scope)
+       └─ On load, reads 'condition' embedded data (set by Survey Flow randomizer)
+          and calls applyAllPreselections(condition)
+       └─ Previously a radio-button Condition Picker — replaced by randomizer so
+          participants cannot see or influence their assigned condition
 
 Q14 — Bakery  ┐
 Q15 — Dairy   │
@@ -111,8 +114,9 @@ ShoppingCart/
 │         • Other research tabs (Power Analysis, Sum of Primary Studies)
 │
 ├── docs/
+│   ├── session-handover-2026-05-14.md — Latest session handover (start here) ⬅ NEXT
 │   ├── basket-build-process.md — Step-by-step guide for updating baskets and deploying
-│   ├── session-handover-2026-05-13.md — Full session handover (start here)
+│   ├── session-handover-2026-05-13.md — Previous session handover
 │   ├── DATA_READINESS.md       — Narrative of data engineering decisions
 │   └── plans/
 │       └── 2026-05-08-registry-build.md
@@ -359,11 +363,11 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | **All JS/HTML files not yet deployed** — 5 artefacts need pasting into Qualtrics (see Deploying section) | Deploy when Imogen's account is available |
-| 2 | **FRZ12 label uncertain** — "Chocolate icecream" assigned by elimination; Excel entry was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
-| 3 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test all 3 conditions with 30 items before data collection |
-| 4 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
-| 5 | **`[DEBUG Submit]` console.log lines still in JS** — noisy in production | Remove from `addOnPageSubmit` in Q14 and Other categories before going live |
-| 6 | **Survey page width** — intro and summary pages wrap on narrow Qualtrics themes | Adjust in Qualtrics Look & Feel → General → Survey Width |
+| 1 | **Randomize basket condition via Survey Flow** — Q1 is currently a radio-button picker; participants can see and select their condition. Replace with Qualtrics Survey Flow randomizer so assignment is blind. Requires JS change in Q1 and changing Q1 question type to Descriptive Text. See `docs/session-handover-2026-05-14.md` for full technical plan. | **Next priority** |
+| 2 | **All JS/HTML files not yet deployed** — 5 artefacts + custom CSS need applying in Qualtrics | Deploy when Imogen's account is available |
+| 3 | **FRZ12 label uncertain** — "Chocolate icecream" assigned by elimination; Excel entry was "Frozen Dessert Cones - Brownie" | Verify in Qualtrics that FRZ12 renders as "Chocolate icecream" |
+| 4 | **No end-to-end test** — all three basket conditions not yet verified in Qualtrics preview | Test all 3 conditions with 30 items before data collection |
+| 5 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify all 10 question titles match expected values |
+| 6 | **`[DEBUG Submit]` console.log lines still in JS** — noisy in production | Remove from `addOnPageSubmit` in Q14 and Other categories before going live |
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).

@@ -14,6 +14,12 @@
 - **BUG: Going back from summary page wiped participant selections** — on back-navigation, Qualtrics reloaded the shopping page and re-fired `applyAllPreselections`, erasing all choices. Fix: `addOnPageSubmit` writes a `_selections_saved` flag; Q1 global scope reads this on load and sets `window._restoreFromEmbedded`; each category's `addOnReady` reads its saved `{sec}_labels` from embedded data and restores the exact checkboxes instead of applying preselections.
 - **BUG: Custom Go Back button unclickable** — `<script>` tags inside Qualtrics question HTML bodies do not execute reliably; click handlers were never attached. Fix: moved all button JS to a dedicated `cart summary question.js` file for the question's JavaScript panel.
 
+### Also added (14 May 2026 — styling and documentation)
+- `qualtrics custom css.css` — saved working Look & Feel CSS with inline documentation. Sets survey content width to 900px (was 770px), forces question wrappers to fill that width, and gives each question a white card background to stand out against the `#DDF5CB` green page background. Paste into Look & Feel → Style → Custom CSS.
+- `survey intro question.html` width constraint removed — now fills Qualtrics container width
+- Early version history (V1–V4) appended to CHANGELOG
+- Helper Scripts section added to README documenting `export qualtrics labels via console.js` and `consolidate_labels.py`
+
 ---
 
 ## 2026-05-13 — Cart Summary Fix, Custom Continue Button, Folder Cleanup
