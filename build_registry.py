@@ -46,7 +46,7 @@ from difflib import SequenceMatcher
 EXCEL_PATH = r'c:\MyApps\ShoppingCart\Combined Justification 8.05.2026.xlsx'
 
 # Output JS file — patched in-place between the [AUTO-GENERATED-START] sentinel and closing };
-JS_PATH = r'c:\MyApps\ShoppingCart\condition question and item metada registry.js'
+JS_PATH = r'c:\MyApps\ShoppingCart\Q1 randomiser and item registry.js'
 
 # Category sheets to process (the 8 non-Bakery/Dairy categories).
 # Bakery and Dairy Eggs Fridge are handled by the baskets tab directly (they sit above the sentinel).

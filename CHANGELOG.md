@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-14 — Blind Basket Randomizer
+
+### Added
+- `Q1 randomiser and item registry.js` — replaces `condition question and item metada registry.js` as the file to paste into Q1's JavaScript panel. Q1 must now be a **Descriptive Text** question (no visible UI). On load, reads the `condition` embedded data field set by the Qualtrics Survey Flow Randomizer and applies basket preselections. Errors to console if `condition` is missing.
+
+### Changed
+- `build_registry.py` — `JS_PATH` updated to point to `Q1 randomiser and item registry.js`
+
+### Fixed
+- **BUG: Preselections not applied when condition assigned by Survey Flow randomizer** — Q1's `addOnReady` fires before category questions have registered their engines into `window._questionEngines`, so `applyAllPreselections` ran against an empty map. Fix: poll on a 100ms interval until all 10 engines are registered (or 40 attempts), then apply.
+- **Known Qualtrics gotcha documented:** placing multiple Embedded Data elements (all setting the same field) under a Randomizer causes all of them to execute — the last one always wins. Correct setup is one separate Embedded Data element per branch, each setting `condition` to a single value.
+
+### Archived
+- `condition question and item metada registry.js` → `archive/` (superseded by `Q1 randomiser and item registry.js`)
+
+---
+
 ## 2026-05-14 — Survey Intro Redesign, Back-Navigation State Restore, Summary Custom Buttons
 
 ### Added
