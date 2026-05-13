@@ -1,6 +1,11 @@
 Qualtrics.SurveyEngine.addOnload(function() {});
 
 Qualtrics.SurveyEngine.addOnReady(function() {
+    if (window.DEBUG_MODE === undefined) {
+        var _age = Qualtrics.SurveyEngine.getEmbeddedData('respondent_age');
+        window.DEBUG_MODE = (String(_age).trim() === '99');
+    }
+
     var self = this;
     var qid = this.questionId;
     var maxItems = 30;
@@ -156,12 +161,14 @@ Qualtrics.SurveyEngine.addOnReady(function() {
             jQuery("#cart-requirement").show();
         }
 
-        jQuery("#cart-health").html(
-            '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
-            '<span style="color:#888;">&#x26AA; Neutral: ' + neutralCount + '</span> &nbsp;' +
-            '<span style="color:#c0392b;">&#x1F534; Unhealthy: ' + unhealthyCount + '</span><br>' +
-            '<strong>Health score: ' + scorePercent + '%</strong>'
-        );
+        if (window.DEBUG_MODE) {
+            jQuery("#cart-health").html(
+                '<span style="color:#2d7a2d;">&#x1F7E2; Healthy: ' + healthyCount + '</span> &nbsp;' +
+                '<span style="color:#888;">&#x26AA; Neutral: ' + neutralCount + '</span> &nbsp;' +
+                '<span style="color:#c0392b;">&#x1F534; Unhealthy: ' + unhealthyCount + '</span><br>' +
+                '<strong>Health score: ' + scorePercent + '%</strong>'
+            );
+        }
 
         // Group selected items by category for sidebar list.
         // Use entry.item.category when available; fall back to the question's own
