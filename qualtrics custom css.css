@@ -1,0 +1,45 @@
+/*
+ * Qualtrics Survey — Custom CSS
+ *
+ * WHERE TO PASTE THIS:
+ *   Qualtrics survey editor → Look & Feel → Style tab → Custom CSS (or "Additional CSS")
+ *
+ * WHAT EACH RULE DOES:
+ *
+ * 1. #SkinContent
+ *    Sets the survey content column to 900px wide.
+ *    The Qualtrics default for this theme was 770px, which caused line-wrapping
+ *    on the intro and summary pages. Increase this value if you want a wider layout.
+ *
+ * 2. .Inner.BorderColor / .InnerInner.BorderColor (width rules)
+ *    Forces the inner question wrappers to fill the full width of #SkinContent
+ *    rather than imposing their own narrower constraint. Without this, widening
+ *    #SkinContent alone has no effect on the question content area.
+ *
+ * 3. .Inner.BorderColor (background / card rules)
+ *    Gives each question a white card background with a soft drop shadow.
+ *    This is needed because the survey page background is set to #DDF5CB (light green)
+ *    in Look & Feel → Style → Background Color. Without this rule, the green bleeds
+ *    through the question containers making them hard to read.
+ *    To change the card background colour, edit the `background` value.
+ *    To remove the shadow, delete the `box-shadow` line.
+ */
+
+#SkinContent {
+    width: 900px !important;
+    max-width: 900px !important;
+}
+
+#SkinContent .Inner.BorderColor,
+#SkinContent .InnerInner.BorderColor {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#SkinContent .Inner.BorderColor {
+    background: #ffffff !important;
+    border-radius: 8px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08) !important;
+}

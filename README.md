@@ -90,6 +90,12 @@ ShoppingCart/
 │       Exports all rendered checkbox labels in DOM order — the authoritative
 │       source of label text for build_registry.py.
 │
+├── qualtrics custom css.css                         ← paste into Qualtrics Look & Feel
+│       Paste into Look & Feel → Style → Custom CSS.
+│       Sets survey width to 900px, forces question content to fill that width,
+│       and gives each question a white card background so it stands out against
+│       the #DDF5CB green page background. See file comments for how to adjust.
+│
 ├── build_registry.py
 │       Python script. Reads the master Excel file and regenerates
 │       condition question and item metada registry.js.
