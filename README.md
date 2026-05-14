@@ -424,5 +424,6 @@ Category keys: `bakery`, `dairy_eggs_fridge`, `drinks`, `snacks`, `fruit`, `meat
 | 7 | **Deploy updated JS to Qualtrics** — Q1, Q14, and Other categories updated in previous session; must be re-pasted if not already done | Before next test |
 | 8 | **`sec` variable depends on question title text** — if any Q15–Q23 question title is renamed in Qualtrics, the derived embedded data key breaks silently | Verify if titles are ever renamed |
 | 9 | **`[DEBUG Submit]` console.log lines still in JS** — intentionally left in; noisy in production | Remove from Q14 and Other categories before final data collection |
+| 10 | ✅ **FAQ page created** — `docs/faq.html` with health score explanation as first entry; expand/collapse UI | Done 2026-05-14 | ⬅️ **NEXT**
 
 For detailed background on the data engineering decisions, see [`docs/DATA_READINESS.md`](docs/DATA_READINESS.md).
